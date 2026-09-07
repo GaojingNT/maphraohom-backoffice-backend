@@ -37,7 +37,7 @@ services:
       - "127.0.0.1:6379:6379"
 
   postgres_db:
-    image: postgres:alpine
+    image: postgres:16-alpine
     restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data

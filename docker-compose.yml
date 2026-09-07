@@ -19,7 +19,7 @@ services:
 
   # Default database is PostgreSQL
   postgres_db:
-    image: postgres:alpine
+    image: postgres:16-alpine
     restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data
