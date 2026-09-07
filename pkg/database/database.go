@@ -105,7 +105,7 @@ func Initialize() *gorm.DB {
 		log.Println("[App] Database connected", color.Format(color.GREEN, "successfully!"))
 
 		// Migrate the database schema by GORM
-		// AutoMigrate(dbConn)
+		AutoMigrate(dbConn)
 
 		// For manual migration, uncomment the line below
 		// ManualMigrate()
@@ -127,6 +127,11 @@ func AutoMigrate(dbConn *gorm.DB) {
 		models.Role{},
 		models.Menu{},
 		models.User{},
+		models.Store{},
+		models.Product{},
+		models.Customer{},
+		models.StoreProductPrice{},
+		models.Bill{},
 	); err != nil {
 		log.Fatal(err)
 	}
