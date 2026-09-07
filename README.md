@@ -270,3 +270,24 @@ FILE_SYSTEM_S3_REGION="us-east-1"
 FILE_SYSTEM_S3_PREFIX=""
 FILE_SYSTEM_S3_USE_SSL=false
  ```
+
+Note: `config.go` loads `.env.dev` when `ENV` is unset/`local`/`development`, and `.env` only when `ENV` is set to something else (e.g. `production`). Copy `.env.example` to `.env.dev` for local development.
+
+## Deployment (VM + GitHub Actions)
+
+- `.github/workflows/ci.yml` — runs `go vet`/`go build`/`go test` on every push and PR.
+- `.github/workflows/deploy.yml` — on push to `main`, builds the Docker image, pushes it to GHCR (`ghcr.io/<owner>/<repo>`), then SSHes into the VM to pull and restart the `app` service.
+- `docker-compose.prod.yml` — production stack (app + redis + postgres + minio) for the VM. Only the app's ports are exposed publicly; db/cache/storage are bound to `127.0.0.1`.
+- `deploy/setup-vm.sh` — one-time VM bootstrap (installs Docker, creates the deploy directory, opens the firewall).
+
+Required GitHub Actions repo secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Purpose |
+|---|---|
+| `VM_HOST` | VM IP or hostname |
+| `VM_USERNAME` | SSH user on the VM |
+| `VM_SSH_KEY` | Private key (PEM) matching a public key already in the VM's `~/.ssh/authorized_keys` |
+| `VM_SSH_PORT` | SSH port (optional, defaults to 22) |
+| `VM_DEPLOY_PATH` | Absolute path on the VM containing `docker-compose.prod.yml` and `.env` (e.g. `/opt/maphraohom-backoffice-backend`) |
+
+The VM's `.env` (real production secrets) is created manually on the VM by copying `.env.example` — it never passes through GitHub.

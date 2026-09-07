@@ -31,9 +31,6 @@ WORKDIR /app
 # Copy executable file from build-stage
 COPY --from=build-stage /usr/local/bin/app /usr/local/bin/app
 
-# Copy env file from build-stage
-COPY --from=build-stage /app/.env /app/.env
-
 # Update OS packages
 RUN apk update && apk upgrade
 

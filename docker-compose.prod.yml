@@ -1,0 +1,63 @@
+networks:
+  maphraohom-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  minio_data:
+  minio_config_data:
+
+services:
+  app:
+    image: ghcr.io/gaojingnt/maphraohom-backoffice-backend:latest
+    restart: always
+    env_file:
+      - .env
+    environment:
+      ENV: "production"
+    networks:
+      - maphraohom-network
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    depends_on:
+      - redis
+      - postgres_db
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    networks:
+      - maphraohom-network
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  postgres_db:
+    image: postgres:alpine
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_DB: ${DATABASE_NAME}
+    networks:
+      - maphraohom-network
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  minio:
+    image: "minio/minio:latest"
+    restart: always
+    networks:
+      - maphraohom-network
+    ports:
+      - "127.0.0.1:8900:9000"
+      - "127.0.0.1:8901:9001"
+    environment:
+      MINIO_ROOT_USER: ${FILE_SYSTEM_S3_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${FILE_SYSTEM_S3_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+      - minio_config_data:/root/.minio
+    command: "minio server /data/minio --console-address :9001"
