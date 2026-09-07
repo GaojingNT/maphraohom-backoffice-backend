@@ -1,0 +1,26 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+/main
+*.exe
+*.test
+*.out
+
+# Go
+vendor/
+
+# Storage / logs (local dev disk)
+/storage/
+/logs/
+
+# RSA certs (generated locally, never commit)
+*.pem
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

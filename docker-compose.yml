@@ -1,0 +1,65 @@
+networks:
+  maphraohom-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  # mssql-2017_data:
+  minio_data:
+  minio_config_data:
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+    networks:
+      - maphraohom-network
+    ports:
+      - "6379:6379"
+
+  # Default database is PostgreSQL
+  postgres_db:
+    image: postgres:alpine
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: "mysecretpassword"
+    networks:
+      - maphraohom-network
+    ports:
+      - "5432:5432"
+
+  # # Microsoft SQL Server 2017
+  # mssql-2017:
+  #   image: mcr.microsoft.com/mssql/server:2017-latest
+  #   restart: always
+  #   networks:
+  #     - maphraohom-network
+  #   ports:
+  #     - "1433:1433"
+  #   platform: "linux/amd64"
+  #   environment:
+  #     ACCEPT_EULA: "Y"
+  #     SA_PASSWORD: "Maphraohom@2025"
+  #   shm_size: '1gb'
+  #   volumes:
+  #     - mssql-2017_data:/var/opt/mssql
+
+  minio:
+    image: "minio/minio:latest"
+    restart: always
+    networks:
+      - maphraohom-network
+    ports:
+      - "8900:9000" # API
+      - "8901:9001" # Console
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: mysecretpassword
+      MINIO_ACCESS_KEY: "admin-access-key"
+      MINIO_SECRET_KEY: "admin-secret-key"
+    volumes:
+      - minio_data:/data
+      - minio_config_data:/root/.minio
+    command: "minio server /data/minio --console-address :9001"

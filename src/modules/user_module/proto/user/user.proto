@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+option go_package = "maphraohom.app/maphraohom-backoffice";
+
+message User {
+    int64 id = 1;
+    string firstName = 2;
+    string lastName = 3;
+    string email = 4;
+    int64 createdAt = 5;
+    int64 updatedAt = 6;
+}
+
+message UserRequest {
+    int64 id = 1;
+}
+
+message Users {
+   repeated User data = 1;
+}
+
+service UserService {
+    rpc GetUsers(stream UserRequest) returns (Users) {}
+}
