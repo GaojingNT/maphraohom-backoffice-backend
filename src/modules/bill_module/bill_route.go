@@ -12,4 +12,5 @@ func (m module) Routes(route fiber.Router, middleware *middlewares.Middleware) {
 	bill := v1.Group("bills")
 	bill.Get("", func(c *fiber.Ctx) error { return m.Controller().GetBills(c) })
 	bill.Get(":id", func(c *fiber.Ctx) error { return m.Controller().GetBill(c) })
+	bill.Post("", func(c *fiber.Ctx) error { return m.Controller().CreateBill(c) })
 }

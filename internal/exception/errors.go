@@ -17,8 +17,9 @@ var (
 	ErrFileSizeLimitExceeded          = eris.New("file size limit exceeded")
 	ErrRequestContentTypeNotSupported = eris.New("request content type not supported")
 	// Database errors
-	ErrDbQueryStatement = eris.New("database query statement error")
-	ErrRecordNotFound   = eris.New("record not found")
+	ErrDbQueryStatement   = eris.New("database query statement error")
+	ErrRecordNotFound     = eris.New("record not found")
+	ErrPriceNotConfigured = eris.New("price not configured for this store and product")
 	// Auth errors
 	ErrInvalidLoginCredential    = eris.New("invalid login credential")
 	ErrInvalidResetPasswordToken = eris.New("invalid reset password token")
@@ -37,8 +38,9 @@ var (
 	NotFoundResponseError            = &ErrorResponse{Code: "S-404", Message: "not found"}
 	ErrorResponseInternalServerError = &ErrorResponse{Code: "S-500", Message: "internal server error"}
 	// Database error response messages
-	DbQueryStatementResponseError = &ErrorResponse{Code: "DB-1001", Message: "database query statement error"}
-	RecordNotFoundResponseError   = &ErrorResponse{Code: "DB-1002", Message: "record not found"}
+	DbQueryStatementResponseError   = &ErrorResponse{Code: "DB-1001", Message: "database query statement error"}
+	RecordNotFoundResponseError     = &ErrorResponse{Code: "DB-1002", Message: "record not found"}
+	PriceNotConfiguredResponseError = &ErrorResponse{Code: "DB-1003", Message: "price not configured for this store and product"}
 	// Auth error response messages
 	InvalidLoginCredentialResponseError    = &ErrorResponse{Code: "A-3001", Message: "invalid login credential"}
 	InvalidResetPasswordTokenResponseError = &ErrorResponse{Code: "A-3002", Message: "invalid reset password token"}

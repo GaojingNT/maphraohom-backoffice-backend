@@ -2,6 +2,7 @@ package bill_module
 
 import (
 	"context"
+	"time"
 
 	"github.com/getsentry/sentry-go"
 	"go.opentelemetry.io/otel/attribute"
@@ -12,6 +13,26 @@ import (
 	"maphraohom.app/maphraohom-backoffice/pkg/database/paginator"
 	"maphraohom.app/maphraohom-backoffice/src/models"
 )
+
+// MaxReceiptNoPerBook is how many receipts ("ใบเสร็จ") fit in one physical
+// book ("เล่ม") before rolling over to the next book. Numbering resets to
+// book 1 / receipt 1 at the start of every calendar year.
+const MaxReceiptNoPerBook = 50
+
+// CreateBillInput carries the already-validated fields the service resolved
+// from the request. Everything derived (book/receipt numbers, price
+// snapshot, total, customer linkage) is computed inside the repository
+// transaction so it stays consistent under concurrent writes.
+type CreateBillInput struct {
+	ProductID       int
+	StoreID         int
+	CustomerName    string
+	CustomerAddress string
+	Kilogram        float64
+	Discount        float64
+	ShippingFee     float64
+	Slip            string
+}
 
 func (r Repository) GetBillPaginate(ctx context.Context, pagination *paginator.Pagination) (*paginator.Pagination, error) {
 	var (
@@ -101,4 +122,164 @@ func (r Repository) GetBillByID(ctx context.Context, id int) (models.Bill, error
 	}
 
 	return bill, nil
+}
+
+func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (models.Bill, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "CreateBillRepository", trace.WithAttributes(attribute.String("repository", "CreateBill")))
+		bill         models.Bill
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Transaction(func(tx *gorm.DB) error {
+				// Serialize bill creation per store so concurrent requests can't
+				// compute the same book/receipt number (Postgres advisory lock,
+				// released automatically at transaction end).
+				if txErr := tx.Exec("SELECT pg_advisory_xact_lock(?)", input.StoreID).Error; txErr != nil {
+					return txErr
+				}
+
+				// Look up the currently effective price for this store/product.
+				var price models.StoreProductPrice
+				if txErr := tx.
+					Where("store_id = ? AND product_id = ? AND effective_from <= ?", input.StoreID, input.ProductID, time.Now()).
+					Order("effective_from DESC").
+					First(&price).Error; txErr != nil {
+					if txErr == gorm.ErrRecordNotFound {
+						return exception.ErrPriceNotConfigured
+					}
+					return txErr
+				}
+
+				// Determine next book/receipt number, resetting every calendar year.
+				startOfYear := time.Date(time.Now().Year(), time.January, 1, 0, 0, 0, 0, time.Local)
+				var lastBill models.Bill
+				bookNo, receiptNo := 1, 1
+				txErr := tx.
+					Where("store_id = ? AND created_at >= ?", input.StoreID, startOfYear).
+					Order("id DESC").
+					First(&lastBill).Error
+				if txErr == nil {
+					if lastBill.ReceiptNo >= MaxReceiptNoPerBook {
+						bookNo = lastBill.BookNo + 1
+						receiptNo = 1
+					} else {
+						bookNo = lastBill.BookNo
+						receiptNo = lastBill.ReceiptNo + 1
+					}
+				} else if txErr != gorm.ErrRecordNotFound {
+					return txErr
+				}
+
+				// Resolve (or create) the customer + address by name.
+				customerID, txErr := r.resolveCustomer(tx, input.CustomerName, input.CustomerAddress)
+				if txErr != nil {
+					return txErr
+				}
+
+				bill = models.Bill{
+					ProductID:       input.ProductID,
+					StoreID:         input.StoreID,
+					CustomerID:      &customerID,
+					BookNo:          bookNo,
+					ReceiptNo:       receiptNo,
+					CustomerName:    input.CustomerName,
+					CustomerAddress: input.CustomerAddress,
+					Kilogram:        input.Kilogram,
+					Price:           price.Price,
+					Discount:        input.Discount,
+					ShippingFee:     input.ShippingFee,
+					Total:           input.Kilogram*price.Price - input.Discount + input.ShippingFee,
+					Slip:            input.Slip,
+				}
+
+				return tx.Create(&bill).Error
+			}); err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			switch e {
+			case exception.ErrPriceNotConfigured:
+				err = exception.ErrPriceNotConfigured
+			default:
+				err = e.(error)
+				// Logging
+				r.logger.Error(err.Error())
+				sentry.CaptureException(err)
+				exception.SqlErrorMessage = err.Error()
+				err = exception.ErrDbQueryStatement
+			}
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	// Check error
+	if err != nil {
+		return bill, err
+	}
+
+	return bill, nil
+}
+
+// resolveCustomer finds a customer by exact name, creating the customer and/or
+// a new address when needed. If the name already exists but this address is
+// new, a new CustomerAddress row is added and marked as the default (the one
+// used to prefill future bills); an exact name+address match is left as-is.
+func (r Repository) resolveCustomer(tx *gorm.DB, name string, address string) (int, error) {
+	var customer models.Customer
+	err := tx.Where("name = ?", name).First(&customer).Error
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return 0, err
+	}
+
+	// New customer: create it plus its first (default) address.
+	if err == gorm.ErrRecordNotFound {
+		customer = models.Customer{Name: name}
+		if err = tx.Create(&customer).Error; err != nil {
+			return 0, err
+		}
+
+		if err = tx.Create(&models.CustomerAddress{
+			CustomerID: customer.ID,
+			Address:    address,
+			IsDefault:  true,
+		}).Error; err != nil {
+			return 0, err
+		}
+
+		return customer.ID, nil
+	}
+
+	// Existing customer: check whether this address is already on file.
+	var existingAddress models.CustomerAddress
+	err = tx.Where("customer_id = ? AND address = ?", customer.ID, address).First(&existingAddress).Error
+	if err == nil {
+		// Address already exists for this customer — nothing to do.
+		return customer.ID, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return 0, err
+	}
+
+	// New address for an existing customer — add it and make it the default.
+	if err = tx.Model(&models.CustomerAddress{}).
+		Where("customer_id = ?", customer.ID).
+		Update("is_default", false).Error; err != nil {
+		return 0, err
+	}
+
+	if err = tx.Create(&models.CustomerAddress{
+		CustomerID: customer.ID,
+		Address:    address,
+		IsDefault:  true,
+	}).Error; err != nil {
+		return 0, err
+	}
+
+	return customer.ID, nil
 }
