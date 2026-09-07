@@ -6,6 +6,7 @@ volumes:
   postgres_data:
   minio_data:
   minio_config_data:
+  app_storage:
 
 services:
   app:
@@ -15,6 +16,8 @@ services:
       - .env
     environment:
       ENV: "production"
+    volumes:
+      - app_storage:/app/storage
     networks:
       - maphraohom-network
     ports:
@@ -27,6 +30,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: always
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     networks:
       - maphraohom-network
     ports:
