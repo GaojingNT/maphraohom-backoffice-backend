@@ -9,10 +9,9 @@ type Customer struct {
 	Name  string `json:"name" gorm:"column:name;size:255;not null;"`
 	Phone string `json:"phone" gorm:"column:phone;size:50;"`
 
-	// Address is the customer's latest/default address, used only to prefill
-	// new bills. It is not linked to past bills — see Bill.CustomerAddress
-	// for the snapshot taken at issue time.
-	Address string `json:"address" gorm:"column:address;size:255;"`
+	// A customer can have many addresses. Bill.CustomerAddress holds an
+	// independent snapshot taken at issue time — it is not linked here.
+	Addresses []CustomerAddress `json:"addresses,omitempty" gorm:"foreignKey:CustomerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 
 	// Soft delete
 	DeletedAt gorm.DeletedAt `json:"deletedAt,omitempty" gorm:"column:deleted_at;index;"`
