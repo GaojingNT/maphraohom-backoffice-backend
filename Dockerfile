@@ -18,6 +18,7 @@ COPY . .
 
 # Build the application
 RUN go build -v -o /usr/local/bin/app
+RUN go build -v -o /usr/local/bin/seed ./cmd/seed
 
 # --- Production stage ---
 FROM golang:1.24-alpine AS production-stage
@@ -30,6 +31,7 @@ WORKDIR /app
 
 # Copy executable file from build-stage
 COPY --from=build-stage /usr/local/bin/app /usr/local/bin/app
+COPY --from=build-stage /usr/local/bin/seed /usr/local/bin/seed
 
 # Update OS packages
 RUN apk update && apk upgrade
