@@ -29,6 +29,13 @@ func (f *FileSystem) getFileFromS3(ctx context.Context, path string) (*os.File, 
 		tempFilePath,
 		minio.GetObjectOptions{},
 	); err != nil {
+		// minio returns an ErrorResponse (not an os.PathError), so
+		// os.IsNotExist(err) would never match a missing S3 key on its
+		// own — translate it so callers can treat S3 and local storage
+		// misses the same way.
+		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+			return nil, os.ErrNotExist
+		}
 		return nil, err
 	}
 
