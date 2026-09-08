@@ -38,6 +38,13 @@ func (f *FileSystem) getFileFromS3(ctx context.Context, path string) (*os.File, 
 		return nil, err
 	}
 
+	// Unlink the temp file now: on Linux the open file descriptor stays
+	// valid (and readable) until outputFile is closed, so the caller can
+	// still stream it, but the file no longer lingers on disk afterwards.
+	if err = os.Remove(tempFilePath); err != nil {
+		log.Printf("[App] FileSystemError: %v\n", err)
+	}
+
 	// File downloaded logging
 	log.Printf("[App] FileSystem (S3): file downloaded from 's3://%s/%s'", f.s3Bucket, path)
 

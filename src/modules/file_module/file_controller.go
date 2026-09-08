@@ -45,7 +45,9 @@ func (c Controller) GetFile(f *fiber.Ctx) error {
 		}
 		return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
 	}
-	defer file.Close()
+	// Do not close file here: fasthttp reads SendStream's io.Reader lazily
+	// after this handler returns, and closes it itself once done (it checks
+	// for io.Closer). Closing it here causes "file already closed" reads.
 
 	if contentType := mime.TypeByExtension(filepath.Ext(key)); contentType != "" {
 		f.Set(fiber.HeaderContentType, contentType)
