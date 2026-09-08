@@ -13,18 +13,22 @@ type (
 
 	// BillItemDetail is one line item within BillDetailResponse.
 	BillItemDetail struct {
-		ID        int     `json:"id"`
-		ProductID int     `json:"productId"`
-		Kilogram  float64 `json:"kilogram"`
-		Price     float64 `json:"price"`
-		Subtotal  float64 `json:"subtotal"`
+		ID          int     `json:"id"`
+		ProductID   int     `json:"productId"`
+		ProductName string  `json:"productName"`
+		Kilogram    float64 `json:"kilogram"`
+		Price       float64 `json:"price"`
+		Subtotal    float64 `json:"subtotal"`
 	}
 
 	// BillDetailResponse is the shape returned by GET /bills/:id — every
-	// bills table column except deleted_at, plus its line items.
+	// bills table column except deleted_at, plus store name/logo and its
+	// line items (with each item's product name).
 	BillDetailResponse struct {
 		ID              int              `json:"id"`
 		StoreID         int              `json:"storeId"`
+		StoreName       string           `json:"storeName"`
+		StoreLogo       string           `json:"storeLogo"`
 		CustomerID      *int             `json:"customerId,omitempty"`
 		BookNo          int              `json:"bookNo"`
 		ReceiptNo       int              `json:"receiptNo"`
@@ -56,18 +60,32 @@ func (BillListItem) Collection(bills []models.Bill) []BillListItem {
 func (response *BillDetailResponse) Make(bill models.Bill) *BillDetailResponse {
 	items := make([]BillItemDetail, 0, len(bill.Items))
 	for _, item := range bill.Items {
+		productName := ""
+		if item.Product != nil {
+			productName = item.Product.Name
+		}
+
 		items = append(items, BillItemDetail{
-			ID:        item.ID,
-			ProductID: item.ProductID,
-			Kilogram:  item.Kilogram,
-			Price:     item.Price,
-			Subtotal:  item.Subtotal,
+			ID:          item.ID,
+			ProductID:   item.ProductID,
+			ProductName: productName,
+			Kilogram:    item.Kilogram,
+			Price:       item.Price,
+			Subtotal:    item.Subtotal,
 		})
+	}
+
+	var storeName, storeLogo string
+	if bill.Store != nil {
+		storeName = bill.Store.Name
+		storeLogo = bill.Store.Logo
 	}
 
 	return &BillDetailResponse{
 		ID:              bill.ID,
 		StoreID:         bill.StoreID,
+		StoreName:       storeName,
+		StoreLogo:       storeLogo,
 		CustomerID:      bill.CustomerID,
 		BookNo:          bill.BookNo,
 		ReceiptNo:       bill.ReceiptNo,

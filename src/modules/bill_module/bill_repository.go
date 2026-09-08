@@ -100,7 +100,7 @@ func (r Repository) GetBillByID(ctx context.Context, id int) (models.Bill, error
 	utils.Block{
 		Try: func() {
 			// Execute query
-			if err = r.db.Preload("Items").First(&bill, id).Error; err != nil {
+			if err = r.db.Preload("Store").Preload("Items.Product").First(&bill, id).Error; err != nil {
 				utils.Throw(err)
 			}
 		},
