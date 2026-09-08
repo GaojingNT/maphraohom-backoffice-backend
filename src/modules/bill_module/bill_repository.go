@@ -106,6 +106,7 @@ func (r Repository) GetBillPaginate(ctx context.Context, pagination *paginator.P
 			// Execute query
 			if err = tx.
 				Preload("Items").
+				Preload("Store").
 				Scopes(models.SearchingScope(models.BillSearchable(), searchAttribute, searchByAttribute)).
 				Scopes(paginator.Paginate(bills, pagination, tx)).
 				Find(&bills).Error; err != nil {
@@ -360,4 +361,36 @@ func (r Repository) resolveCustomer(tx *gorm.DB, name string, address string) (i
 	}
 
 	return customer.ID, nil
+}
+
+func (r Repository) DeleteBill(ctx context.Context, id int) error {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "DeleteBillRepository", trace.WithAttributes(attribute.String("repository", "DeleteBill"), attribute.Int64("id", int64(id))))
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Delete(&models.Bill{}, id).Error; err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			if err == gorm.ErrRecordNotFound {
+				err = exception.ErrRecordNotFound
+			} else {
+				err = e.(error)
+				// Logging
+				r.logger.Error(err.Error())
+				sentry.CaptureException(err)
+				exception.SqlErrorMessage = err.Error()
+				err = exception.ErrDbQueryStatement
+			}
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	return err
 }

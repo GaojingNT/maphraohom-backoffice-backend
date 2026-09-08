@@ -278,7 +278,7 @@ const docTemplate = `{
         },
         "/api/v1/bills": {
             "get": {
-                "description": "Get bills (paginated) — id, receiptNo, customerName, customerAddress,\ntotal, totalKilogram, itemCount, createdAt",
+                "description": "Get bills (paginated) — id, storeId, storeName, receiptNo,\ncustomerName, customerAddress, total, totalKilogram, itemCount, createdAt",
                 "consumes": [
                     "application/json"
                 ],
@@ -445,6 +445,48 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/responses.BillDetailResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete bill by id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Bill Module (Version 1)"
+                ],
+                "summary": "Delete bill",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "bill id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http_response.OkResponse"
                         }
                     },
                     "404": {

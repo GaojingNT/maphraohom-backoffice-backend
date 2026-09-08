@@ -84,3 +84,13 @@ func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill, items []d
 
 	return new(responses.BillDetailResponse).Make(bill), nil
 }
+
+func (s Service) DeleteBill(ctx context.Context, id int) error {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "DeleteBillService", trace.WithAttributes(attribute.String("service", "DeleteBill")))
+
+	err := s.billRepository().DeleteBill(ctx, id)
+
+	s.tracer.TraceEnd(childSpan)
+
+	return err
+}

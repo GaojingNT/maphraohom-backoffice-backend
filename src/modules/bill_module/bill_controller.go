@@ -7,6 +7,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
+	"maphraohom.app/maphraohom-backoffice/internal/http_response"
 	"maphraohom.app/maphraohom-backoffice/internal/validator"
 	"maphraohom.app/maphraohom-backoffice/pkg/database/paginator"
 	"maphraohom.app/maphraohom-backoffice/src/models"
@@ -17,8 +18,8 @@ import (
 // GetBills lists all existing bills
 //
 //	@Summary		List bills
-//	@Description	Get bills (paginated) — id, receiptNo, customerName, customerAddress,
-//	@Description	total, totalKilogram, itemCount, createdAt
+//	@Description	Get bills (paginated) — id, storeId, storeName, receiptNo,
+//	@Description	customerName, customerAddress, total, totalKilogram, itemCount, createdAt
 //	@Tags			Bill Module (Version 1)
 //	@Accept			json
 //	@Produce		json
@@ -163,4 +164,35 @@ func (c Controller) CreateBill(f *fiber.Ctx) error {
 
 	c.m.tracer.TraceEnd(span)
 	return f.Status(fiber.StatusOK).JSON(responseData)
+}
+
+// DeleteBill removes an existing bill by ID (soft delete)
+//
+//	@Summary		Delete bill
+//	@Description	Delete bill by id
+//	@Tags			Bill Module (Version 1)
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		int	true	"bill id"
+//	@Success		200	{object}	http_response.OkResponse
+//	@Failure		404	{object}	exception.ErrorResponse
+//	@Failure		500	{object}	exception.ErrorResponse
+//	@Router			/api/v1/bills/{id} [delete]
+func (c Controller) DeleteBill(f *fiber.Ctx) error {
+	var (
+		id, _     = f.ParamsInt("id")
+		ctx, span = c.m.tracer.TraceStart(f.Context(), "DeleteBillController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "DeleteBill"), attribute.Int("id", id)))
+		err       error
+	)
+
+	err = c.billService().DeleteBill(ctx, id)
+	if err != nil {
+		if err == exception.ErrRecordNotFound {
+			return exception.HttpErrorResponseMapping(f, fiber.StatusNotFound, exception.RecordNotFoundResponseError, err)
+		}
+		return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
+	}
+
+	c.m.tracer.TraceEnd(span)
+	return http_response.HttpOkResponse(f, "OK", "Bill deleted successfully")
 }

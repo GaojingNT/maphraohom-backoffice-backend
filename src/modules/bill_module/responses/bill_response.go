@@ -6,6 +6,8 @@ type (
 	// BillListItem is the shape returned by GET /bills (paginated list).
 	BillListItem struct {
 		ID              int     `json:"id"`
+		StoreID         int     `json:"storeId"`
+		StoreName       string  `json:"storeName"`
 		ReceiptNo       int     `json:"receiptNo"`
 		CustomerName    string  `json:"customerName"`
 		CustomerAddress string  `json:"customerAddress"`
@@ -56,8 +58,15 @@ func (BillListItem) Collection(bills []models.Bill) []BillListItem {
 			totalKilogram += item.Kilogram
 		}
 
+		storeName := ""
+		if bill.Store != nil {
+			storeName = bill.Store.Name
+		}
+
 		items = append(items, BillListItem{
 			ID:              bill.ID,
+			StoreID:         bill.StoreID,
+			StoreName:       storeName,
 			ReceiptNo:       bill.ReceiptNo,
 			CustomerName:    bill.CustomerName,
 			CustomerAddress: bill.CustomerAddress,

@@ -454,8 +454,8 @@ paths:
       consumes:
       - application/json
       description: |-
-        Get bills (paginated) — id, receiptNo, customerName, customerAddress,
-        total, totalKilogram, itemCount, createdAt
+        Get bills (paginated) — id, storeId, storeName, receiptNo,
+        customerName, customerAddress, total, totalKilogram, itemCount, createdAt
       parameters:
       - description: page number
         in: query
@@ -552,6 +552,34 @@ paths:
       tags:
       - Bill Module (Version 1)
   /api/v1/bills/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete bill by id
+      parameters:
+      - description: bill id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http_response.OkResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Delete bill
+      tags:
+      - Bill Module (Version 1)
     get:
       consumes:
       - application/json
