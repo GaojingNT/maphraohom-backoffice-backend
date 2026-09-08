@@ -17,7 +17,8 @@ import (
 // GetBills lists all existing bills
 //
 //	@Summary		List bills
-//	@Description	Get bills (paginated) — id, customerName, customerAddress, total
+//	@Description	Get bills (paginated) — id, receiptNo, customerName, customerAddress,
+//	@Description	total, totalKilogram, itemCount, createdAt
 //	@Tags			Bill Module (Version 1)
 //	@Accept			json
 //	@Produce		json

@@ -105,6 +105,7 @@ func (r Repository) GetBillPaginate(ctx context.Context, pagination *paginator.P
 		Try: func() {
 			// Execute query
 			if err = tx.
+				Preload("Items").
 				Scopes(models.SearchingScope(models.BillSearchable(), searchAttribute, searchByAttribute)).
 				Scopes(paginator.Paginate(bills, pagination, tx)).
 				Find(&bills).Error; err != nil {

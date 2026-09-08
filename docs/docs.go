@@ -276,6 +276,511 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/bills": {
+            "get": {
+                "description": "Get bills (paginated) — id, receiptNo, customerName, customerAddress,\ntotal, totalKilogram, itemCount, createdAt",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Bill Module (Version 1)"
+                ],
+                "summary": "List bills",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search keyword",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by created_at: day, week, month, or year",
+                        "name": "period",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "reference date for period, YYYY-MM-DD (default: today)",
+                        "name": "date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/paginator.Pagination"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a bill with one or more line items. Book/receipt\nnumbers and each item's price are computed server-side (price\nlooked up from the store's current product price); the receipt\nnumber resets every 50 receipts (new book) and every calendar\nyear (back to book 1 / receipt 1).",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Bill Module (Version 1)"
+                ],
+                "summary": "Create bill",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "store id",
+                        "name": "storeId",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "customer name",
+                        "name": "customerName",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "customer address",
+                        "name": "customerAddress",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "JSON array, e.g. [{\\",
+                        "name": "items",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "number",
+                        "description": "discount",
+                        "name": "discount",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "number",
+                        "description": "shipping fee",
+                        "name": "shippingFee",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "slip image",
+                        "name": "slip",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.BillDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/bills/{id}": {
+            "get": {
+                "description": "Get bill by id — every bills column except deleted_at",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Bill Module (Version 1)"
+                ],
+                "summary": "Get bill",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "bill id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.BillDetailResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/customers": {
+            "get": {
+                "description": "Get customers (paginated)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customer Module (Version 1)"
+                ],
+                "summary": "List customers",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search keyword",
+                        "name": "search",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/paginator.Pagination"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/customers/{id}": {
+            "get": {
+                "description": "Get customer by id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customer Module (Version 1)"
+                ],
+                "summary": "Get customer",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "customer id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.CustomerDetailResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/customers/{id}/addresses": {
+            "get": {
+                "description": "Get every address on file for this customer",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customer Module (Version 1)"
+                ],
+                "summary": "List a customer's addresses",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "customer id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/responses.CustomerAddressItem"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/stores": {
+            "get": {
+                "description": "Get stores (paginated)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store Module (Version 1)"
+                ],
+                "summary": "List stores",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search keyword",
+                        "name": "search",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/paginator.Pagination"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/stores/{id}": {
+            "get": {
+                "description": "Get store by id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store Module (Version 1)"
+                ],
+                "summary": "Get store",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "store id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.StoreDetailResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/stores/{id}/products": {
+            "get": {
+                "description": "Get every product's currently effective price at this store",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store Module (Version 1)"
+                ],
+                "summary": "List a store's product prices",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "store id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/responses.StoreProductPriceItem"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/stores/{id}/products/{productId}": {
+            "get": {
+                "description": "Get a single product's currently effective price at this store",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store Module (Version 1)"
+                ],
+                "summary": "Get a store's price for one product",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "store id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "product id",
+                        "name": "productId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.StoreProductPriceItem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/users": {
             "get": {
                 "description": "get users",
@@ -646,6 +1151,128 @@ const docTemplate = `{
                 }
             }
         },
+        "responses.BillDetailResponse": {
+            "type": "object",
+            "properties": {
+                "bookNo": {
+                    "type": "integer"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "customerAddress": {
+                    "type": "string"
+                },
+                "customerId": {
+                    "type": "integer"
+                },
+                "customerName": {
+                    "type": "string"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/responses.BillItemDetail"
+                    }
+                },
+                "receiptNo": {
+                    "type": "integer"
+                },
+                "shippingFee": {
+                    "type": "number"
+                },
+                "slip": {
+                    "type": "string"
+                },
+                "storeId": {
+                    "type": "integer"
+                },
+                "storeLogo": {
+                    "type": "string"
+                },
+                "storeName": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "number"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.BillItemDetail": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "kilogram": {
+                    "type": "number"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "productId": {
+                    "type": "integer"
+                },
+                "productName": {
+                    "type": "string"
+                },
+                "subtotal": {
+                    "type": "number"
+                }
+            }
+        },
+        "responses.CustomerAddressItem": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "isDefault": {
+                    "type": "boolean"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.CustomerDetailResponse": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
         "responses.GetProfileResponse": {
             "type": "object",
             "properties": {
@@ -802,6 +1429,43 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/responses.UserResponse"
+                }
+            }
+        },
+        "responses.StoreDetailResponse": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "logo": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.StoreProductPriceItem": {
+            "type": "object",
+            "properties": {
+                "effectiveFrom": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "productId": {
+                    "type": "integer"
+                },
+                "productName": {
+                    "type": "string"
                 }
             }
         },

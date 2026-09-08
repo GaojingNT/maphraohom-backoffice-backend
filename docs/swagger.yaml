@@ -45,6 +45,86 @@ definitions:
       totalRows:
         type: integer
     type: object
+  responses.BillDetailResponse:
+    properties:
+      bookNo:
+        type: integer
+      createdAt:
+        type: string
+      customerAddress:
+        type: string
+      customerId:
+        type: integer
+      customerName:
+        type: string
+      discount:
+        type: number
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/responses.BillItemDetail'
+        type: array
+      receiptNo:
+        type: integer
+      shippingFee:
+        type: number
+      slip:
+        type: string
+      storeId:
+        type: integer
+      storeLogo:
+        type: string
+      storeName:
+        type: string
+      total:
+        type: number
+      updatedAt:
+        type: string
+    type: object
+  responses.BillItemDetail:
+    properties:
+      id:
+        type: integer
+      kilogram:
+        type: number
+      price:
+        type: number
+      productId:
+        type: integer
+      productName:
+        type: string
+      subtotal:
+        type: number
+    type: object
+  responses.CustomerAddressItem:
+    properties:
+      address:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: integer
+      isDefault:
+        type: boolean
+      label:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  responses.CustomerDetailResponse:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      phone:
+        type: string
+      updatedAt:
+        type: string
+    type: object
   responses.GetProfileResponse:
     properties:
       createdAt:
@@ -146,6 +226,30 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/responses.UserResponse'
+    type: object
+  responses.StoreDetailResponse:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: integer
+      logo:
+        type: string
+      name:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  responses.StoreProductPriceItem:
+    properties:
+      effectiveFrom:
+        type: string
+      price:
+        type: number
+      productId:
+        type: integer
+      productName:
+        type: string
     type: object
   responses.UserResponse:
     properties:
@@ -345,6 +449,347 @@ paths:
       summary: Sign in
       tags:
       - Auth Module (Version 1)
+  /api/v1/bills:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Get bills (paginated) — id, receiptNo, customerName, customerAddress,
+        total, totalKilogram, itemCount, createdAt
+      parameters:
+      - description: page number
+        in: query
+        name: page
+        type: string
+      - description: page size
+        in: query
+        name: limit
+        type: string
+      - description: search keyword
+        in: query
+        name: search
+        type: string
+      - description: 'filter by created_at: day, week, month, or year'
+        in: query
+        name: period
+        type: string
+      - description: 'reference date for period, YYYY-MM-DD (default: today)'
+        in: query
+        name: date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/paginator.Pagination'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: List bills
+      tags:
+      - Bill Module (Version 1)
+    post:
+      consumes:
+      - multipart/form-data
+      description: |-
+        Create a bill with one or more line items. Book/receipt
+        numbers and each item's price are computed server-side (price
+        looked up from the store's current product price); the receipt
+        number resets every 50 receipts (new book) and every calendar
+        year (back to book 1 / receipt 1).
+      parameters:
+      - description: store id
+        in: formData
+        name: storeId
+        required: true
+        type: integer
+      - description: customer name
+        in: formData
+        name: customerName
+        required: true
+        type: string
+      - description: customer address
+        in: formData
+        name: customerAddress
+        required: true
+        type: string
+      - description: JSON array, e.g. [{\
+        in: formData
+        name: items
+        required: true
+        type: string
+      - description: discount
+        in: formData
+        name: discount
+        type: number
+      - description: shipping fee
+        in: formData
+        name: shippingFee
+        type: number
+      - description: slip image
+        in: formData
+        name: slip
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.BillDetailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Create bill
+      tags:
+      - Bill Module (Version 1)
+  /api/v1/bills/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get bill by id — every bills column except deleted_at
+      parameters:
+      - description: bill id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.BillDetailResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Get bill
+      tags:
+      - Bill Module (Version 1)
+  /api/v1/customers:
+    get:
+      consumes:
+      - application/json
+      description: Get customers (paginated)
+      parameters:
+      - description: page number
+        in: query
+        name: page
+        type: string
+      - description: page size
+        in: query
+        name: limit
+        type: string
+      - description: search keyword
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/paginator.Pagination'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: List customers
+      tags:
+      - Customer Module (Version 1)
+  /api/v1/customers/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get customer by id
+      parameters:
+      - description: customer id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.CustomerDetailResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Get customer
+      tags:
+      - Customer Module (Version 1)
+  /api/v1/customers/{id}/addresses:
+    get:
+      consumes:
+      - application/json
+      description: Get every address on file for this customer
+      parameters:
+      - description: customer id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/responses.CustomerAddressItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: List a customer's addresses
+      tags:
+      - Customer Module (Version 1)
+  /api/v1/stores:
+    get:
+      consumes:
+      - application/json
+      description: Get stores (paginated)
+      parameters:
+      - description: page number
+        in: query
+        name: page
+        type: string
+      - description: page size
+        in: query
+        name: limit
+        type: string
+      - description: search keyword
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/paginator.Pagination'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: List stores
+      tags:
+      - Store Module (Version 1)
+  /api/v1/stores/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get store by id
+      parameters:
+      - description: store id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.StoreDetailResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Get store
+      tags:
+      - Store Module (Version 1)
+  /api/v1/stores/{id}/products:
+    get:
+      consumes:
+      - application/json
+      description: Get every product's currently effective price at this store
+      parameters:
+      - description: store id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/responses.StoreProductPriceItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: List a store's product prices
+      tags:
+      - Store Module (Version 1)
+  /api/v1/stores/{id}/products/{productId}:
+    get:
+      consumes:
+      - application/json
+      description: Get a single product's currently effective price at this store
+      parameters:
+      - description: store id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: product id
+        in: path
+        name: productId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.StoreProductPriceItem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Get a store's price for one product
+      tags:
+      - Store Module (Version 1)
   /api/v1/users:
     get:
       consumes:

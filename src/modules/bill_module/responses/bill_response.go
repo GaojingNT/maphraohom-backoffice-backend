@@ -6,9 +6,13 @@ type (
 	// BillListItem is the shape returned by GET /bills (paginated list).
 	BillListItem struct {
 		ID              int     `json:"id"`
+		ReceiptNo       int     `json:"receiptNo"`
 		CustomerName    string  `json:"customerName"`
 		CustomerAddress string  `json:"customerAddress"`
 		Total           float64 `json:"total"`
+		TotalKilogram   float64 `json:"totalKilogram"`
+		ItemCount       int     `json:"itemCount"`
+		CreatedAt       string  `json:"createdAt"`
 	}
 
 	// BillItemDetail is one line item within BillDetailResponse.
@@ -47,11 +51,20 @@ type (
 func (BillListItem) Collection(bills []models.Bill) []BillListItem {
 	items := make([]BillListItem, 0, len(bills))
 	for _, bill := range bills {
+		var totalKilogram float64
+		for _, item := range bill.Items {
+			totalKilogram += item.Kilogram
+		}
+
 		items = append(items, BillListItem{
 			ID:              bill.ID,
+			ReceiptNo:       bill.ReceiptNo,
 			CustomerName:    bill.CustomerName,
 			CustomerAddress: bill.CustomerAddress,
 			Total:           bill.Total,
+			TotalKilogram:   totalKilogram,
+			ItemCount:       len(bill.Items),
+			CreatedAt:       bill.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 	return items
