@@ -11,7 +11,7 @@ import (
 )
 
 func (f *FileSystem) getFileFromLocalStorage(path string) (*os.File, error) {
-	return os.Open(path)
+	return os.Open(fmt.Sprintf("%s/%s", config.Global.FileSystem.LocalPath, path))
 }
 
 func (f *FileSystem) putFileToLocalStorage(path string, fileName string, fileParam interface{}) error {

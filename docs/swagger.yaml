@@ -768,6 +768,37 @@ paths:
       summary: List a customer's addresses
       tags:
       - Customer Module (Version 1)
+  /api/v1/files/{path}:
+    get:
+      description: |-
+        Stream a file previously uploaded via POST/PUT /bills (e.g. a
+        payment slip) by its storage key, such as bills/slips/<uuid>.jpeg
+      parameters:
+      - description: storage key, e.g. bills/slips/<uuid>.jpeg
+        in: path
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Get an uploaded file
+      tags:
+      - File Module (Version 1)
   /api/v1/stores:
     get:
       consumes:

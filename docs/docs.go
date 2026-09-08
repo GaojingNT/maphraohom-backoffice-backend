@@ -738,6 +738,50 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/files/{path}": {
+            "get": {
+                "description": "Stream a file previously uploaded via POST/PUT /bills (e.g. a\npayment slip) by its storage key, such as bills/slips/\u003cuuid\u003e.jpeg",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "File Module (Version 1)"
+                ],
+                "summary": "Get an uploaded file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "storage key, e.g. bills/slips/\u003cuuid\u003e.jpeg",
+                        "name": "path",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/stores": {
             "get": {
                 "description": "Get stores (paginated)",
