@@ -1,6 +1,8 @@
 package bill_module
 
 import (
+	"encoding/json"
+
 	"github.com/gofiber/fiber/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -91,18 +93,18 @@ func (c Controller) GetBill(f *fiber.Ctx) error {
 // CreateBill creates a new bill
 //
 //	@Summary		Create bill
-//	@Description	Create a bill. Book/receipt numbers and price are computed
-//	@Description	server-side; the price is looked up from the store's current
-//	@Description	product price and the receipt number resets every 50 receipts
-//	@Description	(new book) and every calendar year (back to book 1 / receipt 1).
+//	@Description	Create a bill with one or more line items. Book/receipt
+//	@Description	numbers and each item's price are computed server-side (price
+//	@Description	looked up from the store's current product price); the receipt
+//	@Description	number resets every 50 receipts (new book) and every calendar
+//	@Description	year (back to book 1 / receipt 1).
 //	@Tags			Bill Module (Version 1)
 //	@Accept			mpfd
 //	@Produce		json
-//	@Param			productId		formData	int		true	"product id"
 //	@Param			storeId			formData	int		true	"store id"
 //	@Param			customerName	formData	string	true	"customer name"
 //	@Param			customerAddress	formData	string	true	"customer address"
-//	@Param			kilogram		formData	number	true	"kilogram"
+//	@Param			items			formData	string	true	"JSON array, e.g. [{\"productId\":1,\"kilogram\":2.5}]"
 //	@Param			discount		formData	number	false	"discount"
 //	@Param			shippingFee		formData	number	false	"shipping fee"
 //	@Param			slip			formData	file	false	"slip image"
@@ -130,10 +132,21 @@ func (c Controller) CreateBill(f *fiber.Ctx) error {
 		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, exception.ErrInvalidRequestParameter, errors...)
 	}
 
+	// Items is a JSON-encoded array within the multipart form (see dtos.CreateBill).
+	var items []dtos.CreateBillItem
+	if err = json.Unmarshal([]byte(dto.Items), &items); err != nil || len(items) == 0 {
+		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, exception.ErrInvalidRequestParameter)
+	}
+	for _, item := range items {
+		if itemErrors := validator.Validate(item); itemErrors != nil {
+			return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, exception.ErrInvalidRequestParameter, itemErrors...)
+		}
+	}
+
 	// Slip is optional — ignore the error when the field is simply absent
 	slip, _ := f.FormFile("slip")
 
-	responseData, err := c.billService().CreateBill(ctx, dto, slip)
+	responseData, err := c.billService().CreateBill(ctx, dto, items, slip)
 	if err != nil {
 		if err == exception.ErrPriceNotConfigured {
 			return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.PriceNotConfiguredResponseError, err)

@@ -45,7 +45,7 @@ func (s Service) GetBill(ctx context.Context, id int) (*responses.BillDetailResp
 
 // CreateBill uploads the slip (if provided) then creates the bill. slip may
 // be nil — the slip column is left empty in that case.
-func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill, slip *multipart.FileHeader) (*responses.BillDetailResponse, error) {
+func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill, items []dtos.CreateBillItem, slip *multipart.FileHeader) (*responses.BillDetailResponse, error) {
 	ctx, childSpan := s.tracer.TraceStart(ctx, "CreateBillService", trace.WithAttributes(attribute.String("service", "CreateBill")))
 
 	var slipKey string
@@ -58,15 +58,22 @@ func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill, slip *mul
 		slipKey = fmt.Sprintf("%s/%s", billSlipPath, fileName)
 	}
 
+	inputItems := make([]CreateBillItemInput, 0, len(items))
+	for _, item := range items {
+		inputItems = append(inputItems, CreateBillItemInput{
+			ProductID: item.ProductID,
+			Kilogram:  item.Kilogram,
+		})
+	}
+
 	bill, err := s.billRepository().CreateBill(ctx, CreateBillInput{
-		ProductID:       dto.ProductID,
 		StoreID:         dto.StoreID,
 		CustomerName:    dto.CustomerName,
 		CustomerAddress: dto.CustomerAddress,
-		Kilogram:        dto.Kilogram,
 		Discount:        dto.Discount,
 		ShippingFee:     dto.ShippingFee,
 		Slip:            slipKey,
+		Items:           inputItems,
 	})
 
 	s.tracer.TraceEnd(childSpan)

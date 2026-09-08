@@ -9,7 +9,8 @@ type Customer struct {
 	Name  string `json:"name" gorm:"column:name;size:255;not null;"`
 	Phone string `json:"phone" gorm:"column:phone;size:50;"`
 
-	// A customer can have many addresses. Bill.CustomerAddress holds an
+	// A customer can have many addresses; CustomerAddress.IsDefault marks
+	// the one used to prefill new bills. Bill.CustomerAddress holds an
 	// independent snapshot taken at issue time — it is not linked here.
 	Addresses []CustomerAddress `json:"addresses,omitempty" gorm:"foreignKey:CustomerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 

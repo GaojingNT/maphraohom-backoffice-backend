@@ -19,19 +19,24 @@ import (
 // book 1 / receipt 1 at the start of every calendar year.
 const MaxReceiptNoPerBook = 50
 
+// CreateBillItemInput is one line item of a create-bill request.
+type CreateBillItemInput struct {
+	ProductID int
+	Kilogram  float64
+}
+
 // CreateBillInput carries the already-validated fields the service resolved
 // from the request. Everything derived (book/receipt numbers, price
-// snapshot, total, customer linkage) is computed inside the repository
-// transaction so it stays consistent under concurrent writes.
+// snapshots, subtotals, total, customer linkage) is computed inside the
+// repository transaction so it stays consistent under concurrent writes.
 type CreateBillInput struct {
-	ProductID       int
 	StoreID         int
 	CustomerName    string
 	CustomerAddress string
-	Kilogram        float64
 	Discount        float64
 	ShippingFee     float64
 	Slip            string
+	Items           []CreateBillItemInput
 }
 
 func (r Repository) GetBillPaginate(ctx context.Context, pagination *paginator.Pagination) (*paginator.Pagination, error) {
@@ -95,7 +100,7 @@ func (r Repository) GetBillByID(ctx context.Context, id int) (models.Bill, error
 	utils.Block{
 		Try: func() {
 			// Execute query
-			if err = r.db.First(&bill, id).Error; err != nil {
+			if err = r.db.Preload("Items").First(&bill, id).Error; err != nil {
 				utils.Throw(err)
 			}
 		},
@@ -141,20 +146,35 @@ func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (mode
 					return txErr
 				}
 
-				// Look up the currently effective price for this store/product.
-				var price models.StoreProductPrice
-				if txErr := tx.
-					Where("store_id = ? AND product_id = ? AND effective_from <= ?", input.StoreID, input.ProductID, time.Now()).
-					Order("effective_from DESC").
-					First(&price).Error; txErr != nil {
-					if txErr == gorm.ErrRecordNotFound {
-						return exception.ErrPriceNotConfigured
+				// Price each line item from the store's currently effective price.
+				now := time.Now()
+				billItems := make([]models.BillItem, 0, len(input.Items))
+				var total float64
+				for _, item := range input.Items {
+					var price models.StoreProductPrice
+					if txErr := tx.
+						Where("store_id = ? AND product_id = ? AND effective_from <= ?", input.StoreID, item.ProductID, now).
+						Order("effective_from DESC").
+						First(&price).Error; txErr != nil {
+						if txErr == gorm.ErrRecordNotFound {
+							return exception.ErrPriceNotConfigured
+						}
+						return txErr
 					}
-					return txErr
+
+					subtotal := item.Kilogram * price.Price
+					billItems = append(billItems, models.BillItem{
+						ProductID: item.ProductID,
+						Kilogram:  item.Kilogram,
+						Price:     price.Price,
+						Subtotal:  subtotal,
+					})
+					total += subtotal
 				}
+				total = total - input.Discount + input.ShippingFee
 
 				// Determine next book/receipt number, resetting every calendar year.
-				startOfYear := time.Date(time.Now().Year(), time.January, 1, 0, 0, 0, 0, time.Local)
+				startOfYear := time.Date(now.Year(), time.January, 1, 0, 0, 0, 0, time.Local)
 				var lastBill models.Bill
 				bookNo, receiptNo := 1, 1
 				txErr := tx.
@@ -173,29 +193,41 @@ func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (mode
 					return txErr
 				}
 
-				// Resolve (or create) the customer + address by name.
+				// Resolve (or create) the customer, keeping its default address
+				// up to date with the latest one used.
 				customerID, txErr := r.resolveCustomer(tx, input.CustomerName, input.CustomerAddress)
 				if txErr != nil {
 					return txErr
 				}
 
 				bill = models.Bill{
-					ProductID:       input.ProductID,
 					StoreID:         input.StoreID,
 					CustomerID:      &customerID,
 					BookNo:          bookNo,
 					ReceiptNo:       receiptNo,
 					CustomerName:    input.CustomerName,
 					CustomerAddress: input.CustomerAddress,
-					Kilogram:        input.Kilogram,
-					Price:           price.Price,
 					Discount:        input.Discount,
 					ShippingFee:     input.ShippingFee,
-					Total:           input.Kilogram*price.Price - input.Discount + input.ShippingFee,
+					Total:           total,
 					Slip:            input.Slip,
 				}
 
-				return tx.Create(&bill).Error
+				if txErr := tx.Create(&bill).Error; txErr != nil {
+					return txErr
+				}
+
+				for i := range billItems {
+					billItems[i].BillID = bill.ID
+				}
+
+				if txErr := tx.Create(&billItems).Error; txErr != nil {
+					return txErr
+				}
+
+				bill.Items = billItems
+
+				return nil
 			}); err != nil {
 				utils.Throw(err)
 			}

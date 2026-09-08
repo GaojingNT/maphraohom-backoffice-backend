@@ -133,6 +133,7 @@ func AutoMigrate(dbConn *gorm.DB) {
 		models.CustomerAddress{},
 		models.StoreProductPrice{},
 		models.Bill{},
+		models.BillItem{},
 	); err != nil {
 		log.Fatal(err)
 	}
