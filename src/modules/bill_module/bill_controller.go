@@ -24,6 +24,8 @@ import (
 //	@Param			page	query		string	false	"page number"
 //	@Param			limit	query		string	false	"page size"
 //	@Param			search	query		string	false	"search keyword"
+//	@Param			period	query		string	false	"filter by created_at: day, week, month, or year"
+//	@Param			date	query		string	false	"reference date for period, YYYY-MM-DD (default: today)"
 //	@Success		200		{object}	paginator.Pagination
 //	@Failure		500		{object}	exception.ErrorResponse
 //	@Router			/api/v1/bills [get]
@@ -39,6 +41,8 @@ func (c Controller) GetBills(f *fiber.Ctx) error {
 	queryLimit := f.QueryInt("limit", 20)
 	querySearch := f.Query("search")
 	querySearchBy := f.Query("searchBy")
+	queryPeriod := f.Query("period")
+	queryDate := f.Query("date")
 
 	// Get paginate values
 	paginate := paginator.NewPagination(
@@ -47,6 +51,8 @@ func (c Controller) GetBills(f *fiber.Ctx) error {
 		paginator.WithAttributes("search", querySearch),
 		paginator.WithAttributes("search_by", querySearchBy),
 		paginator.WithAttributes("searchable", models.BillSearchable()),
+		paginator.WithAttributes("period", queryPeriod),
+		paginator.WithAttributes("date", queryDate),
 	)
 
 	responseData, err = c.billService().GetBills(ctx, paginate)

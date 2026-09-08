@@ -39,6 +39,45 @@ type CreateBillInput struct {
 	Items           []CreateBillItemInput
 }
 
+// billPeriodRange resolves a "day"/"week"/"month"/"year" period (relative to
+// refDate, or today if refDate is empty/unparseable) into a [from, to) range
+// for filtering bills.created_at. Week starts on Monday. ok is false when
+// period is empty or unrecognized, meaning no date filter should be applied.
+func billPeriodRange(period string, refDate string) (from time.Time, to time.Time, ok bool) {
+	if period == "" {
+		return time.Time{}, time.Time{}, false
+	}
+
+	ref := time.Now()
+	if refDate != "" {
+		if parsed, err := time.ParseInLocation("2006-01-02", refDate, time.Local); err == nil {
+			ref = parsed
+		}
+	}
+	startOfDay := time.Date(ref.Year(), ref.Month(), ref.Day(), 0, 0, 0, 0, time.Local)
+
+	switch period {
+	case "day":
+		return startOfDay, startOfDay.AddDate(0, 0, 1), true
+	case "week":
+		// ISO week starting Monday.
+		weekday := int(startOfDay.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		from = startOfDay.AddDate(0, 0, -(weekday - 1))
+		return from, from.AddDate(0, 0, 7), true
+	case "month":
+		from = time.Date(ref.Year(), ref.Month(), 1, 0, 0, 0, 0, time.Local)
+		return from, from.AddDate(0, 1, 0), true
+	case "year":
+		from = time.Date(ref.Year(), time.January, 1, 0, 0, 0, 0, time.Local)
+		return from, from.AddDate(1, 0, 0), true
+	default:
+		return time.Time{}, time.Time{}, false
+	}
+}
+
 func (r Repository) GetBillPaginate(ctx context.Context, pagination *paginator.Pagination) (*paginator.Pagination, error) {
 	var (
 		_, childSpan = r.tracer.TraceStart(ctx, "GetBillPaginateRepository", trace.WithAttributes(attribute.String("repository", "GetBillPaginate")))
@@ -49,12 +88,18 @@ func (r Repository) GetBillPaginate(ctx context.Context, pagination *paginator.P
 	// Get attributes
 	searchAttribute, _ := pagination.GetStringAttribute("search")
 	searchByAttribute, _ := pagination.GetStringAttribute("search_by")
+	periodAttribute, _ := pagination.GetStringAttribute("period")
+	dateAttribute, _ := pagination.GetStringAttribute("date")
 
 	// Set tracing attributes
 	r.tracer.SetAttributes(childSpan, attribute.String("search", searchAttribute))
 	r.tracer.SetAttributes(childSpan, attribute.String("search_by", searchByAttribute))
+	r.tracer.SetAttributes(childSpan, attribute.String("period", periodAttribute))
 
 	tx := r.db
+	if from, to, ok := billPeriodRange(periodAttribute, dateAttribute); ok {
+		tx = tx.Where("created_at >= ? AND created_at < ?", from, to)
+	}
 
 	utils.Block{
 		Try: func() {
