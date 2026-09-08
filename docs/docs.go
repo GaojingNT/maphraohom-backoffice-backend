@@ -461,6 +461,106 @@ const docTemplate = `{
                     }
                 }
             },
+            "put": {
+                "description": "Replace a bill's store, customer, items, discount, shipping\nfee, and (optionally) slip. Book/receipt numbers are kept as-is;\neach item's price is re-looked-up from the store's current\nproduct price, same as create.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Bill Module (Version 1)"
+                ],
+                "summary": "Update bill",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "bill id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "store id",
+                        "name": "storeId",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "customer name",
+                        "name": "customerName",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "customer address",
+                        "name": "customerAddress",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "JSON array, e.g. [{\\",
+                        "name": "items",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "number",
+                        "description": "discount",
+                        "name": "discount",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "number",
+                        "description": "shipping fee",
+                        "name": "shippingFee",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "new slip image (replaces the existing one)",
+                        "name": "slip",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "clear the existing slip (ignored if a new slip is uploaded)",
+                        "name": "removeSlip",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.BillDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "description": "Delete bill by id",
                 "consumes": [

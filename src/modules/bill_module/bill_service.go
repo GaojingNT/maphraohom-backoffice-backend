@@ -85,6 +85,53 @@ func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill, items []d
 	return new(responses.BillDetailResponse).Make(bill), nil
 }
 
+// UpdateBill replaces a bill's editable fields and its items. A new slip
+// upload always wins; otherwise dto.RemoveSlip clears the existing slip,
+// and if neither applies the existing slip is left untouched.
+func (s Service) UpdateBill(ctx context.Context, id int, dto *dtos.UpdateBill, items []dtos.CreateBillItem, slip *multipart.FileHeader) (*responses.BillDetailResponse, error) {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "UpdateBillService", trace.WithAttributes(attribute.String("service", "UpdateBill")))
+
+	var slipKey *string
+	if slip != nil {
+		fileName := fmt.Sprintf("%s%s", uuid.New().String(), filepath.Ext(slip.Filename))
+		if err := s.fileSystem.Put(ctx, billSlipPath, fileName, slip); err != nil {
+			s.tracer.TraceEnd(childSpan)
+			return nil, err
+		}
+		key := fmt.Sprintf("%s/%s", billSlipPath, fileName)
+		slipKey = &key
+	} else if dto.RemoveSlip {
+		empty := ""
+		slipKey = &empty
+	}
+
+	inputItems := make([]CreateBillItemInput, 0, len(items))
+	for _, item := range items {
+		inputItems = append(inputItems, CreateBillItemInput{
+			ProductID: item.ProductID,
+			Kilogram:  item.Kilogram,
+		})
+	}
+
+	bill, err := s.billRepository().UpdateBill(ctx, id, UpdateBillInput{
+		StoreID:         dto.StoreID,
+		CustomerName:    dto.CustomerName,
+		CustomerAddress: dto.CustomerAddress,
+		Discount:        dto.Discount,
+		ShippingFee:     dto.ShippingFee,
+		Slip:            slipKey,
+		Items:           inputItems,
+	})
+
+	s.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return new(responses.BillDetailResponse).Make(bill), nil
+}
+
 func (s Service) DeleteBill(ctx context.Context, id int) error {
 	ctx, childSpan := s.tracer.TraceStart(ctx, "DeleteBillService", trace.WithAttributes(attribute.String("service", "DeleteBill")))
 

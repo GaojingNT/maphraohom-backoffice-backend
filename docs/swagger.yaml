@@ -608,6 +608,78 @@ paths:
       summary: Get bill
       tags:
       - Bill Module (Version 1)
+    put:
+      consumes:
+      - multipart/form-data
+      description: |-
+        Replace a bill's store, customer, items, discount, shipping
+        fee, and (optionally) slip. Book/receipt numbers are kept as-is;
+        each item's price is re-looked-up from the store's current
+        product price, same as create.
+      parameters:
+      - description: bill id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: store id
+        in: formData
+        name: storeId
+        required: true
+        type: integer
+      - description: customer name
+        in: formData
+        name: customerName
+        required: true
+        type: string
+      - description: customer address
+        in: formData
+        name: customerAddress
+        required: true
+        type: string
+      - description: JSON array, e.g. [{\
+        in: formData
+        name: items
+        required: true
+        type: string
+      - description: discount
+        in: formData
+        name: discount
+        type: number
+      - description: shipping fee
+        in: formData
+        name: shippingFee
+        type: number
+      - description: new slip image (replaces the existing one)
+        in: formData
+        name: slip
+        type: file
+      - description: clear the existing slip (ignored if a new slip is uploaded)
+        in: formData
+        name: removeSlip
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.BillDetailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Update bill
+      tags:
+      - Bill Module (Version 1)
   /api/v1/customers:
     get:
       consumes:

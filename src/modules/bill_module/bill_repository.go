@@ -39,6 +39,21 @@ type CreateBillInput struct {
 	Items           []CreateBillItemInput
 }
 
+// UpdateBillInput carries the already-validated fields for replacing a
+// bill's editable fields and its full set of line items (existing items are
+// deleted and recreated, not diffed). Book/receipt numbers are untouched.
+// Slip is nil to leave the existing slip as-is, or a pointer to the new
+// value (possibly "") to replace/clear it.
+type UpdateBillInput struct {
+	StoreID         int
+	CustomerName    string
+	CustomerAddress string
+	Discount        float64
+	ShippingFee     float64
+	Slip            *string
+	Items           []CreateBillItemInput
+}
+
 // billPeriodRange resolves a "day"/"week"/"month"/"year" period (relative to
 // refDate, or today if refDate is empty/unparseable) into a [from, to) range
 // for filtering bills.created_at. Week starts on Monday. ok is false when
@@ -299,6 +314,123 @@ func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (mode
 
 	// Check error
 	if err != nil {
+		return bill, err
+	}
+
+	return bill, nil
+}
+
+// UpdateBill replaces a bill's editable fields and line items in one
+// transaction. Book/receipt numbers are never touched. Line items are
+// deleted and recreated wholesale rather than diffed against the request.
+func (r Repository) UpdateBill(ctx context.Context, id int, input UpdateBillInput) (models.Bill, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "UpdateBillRepository", trace.WithAttributes(attribute.String("repository", "UpdateBill"), attribute.Int64("id", int64(id))))
+		bill         models.Bill
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Transaction(func(tx *gorm.DB) error {
+				if txErr := tx.First(&bill, id).Error; txErr != nil {
+					if txErr == gorm.ErrRecordNotFound {
+						return exception.ErrRecordNotFound
+					}
+					return txErr
+				}
+
+				// Price each line item from the store's currently effective price.
+				now := time.Now()
+				billItems := make([]models.BillItem, 0, len(input.Items))
+				var total float64
+				for _, item := range input.Items {
+					var price models.StoreProductPrice
+					if txErr := tx.
+						Where("store_id = ? AND product_id = ? AND effective_from <= ?", input.StoreID, item.ProductID, now).
+						Order("effective_from DESC").
+						First(&price).Error; txErr != nil {
+						if txErr == gorm.ErrRecordNotFound {
+							return exception.ErrPriceNotConfigured
+						}
+						return txErr
+					}
+
+					subtotal := item.Kilogram * price.Price
+					billItems = append(billItems, models.BillItem{
+						BillID:    bill.ID,
+						ProductID: item.ProductID,
+						Kilogram:  item.Kilogram,
+						Price:     price.Price,
+						Subtotal:  subtotal,
+					})
+					total += subtotal
+				}
+				total = total - input.Discount + input.ShippingFee
+
+				// Resolve (or create) the customer, same as create.
+				customerID, txErr := r.resolveCustomer(tx, input.CustomerName, input.CustomerAddress)
+				if txErr != nil {
+					return txErr
+				}
+
+				// Replace line items wholesale rather than diffing.
+				if txErr := tx.Where("bill_id = ?", bill.ID).Delete(&models.BillItem{}).Error; txErr != nil {
+					return txErr
+				}
+				if txErr := tx.Create(&billItems).Error; txErr != nil {
+					return txErr
+				}
+
+				bill.StoreID = input.StoreID
+				bill.CustomerID = &customerID
+				bill.CustomerName = input.CustomerName
+				bill.CustomerAddress = input.CustomerAddress
+				bill.Discount = input.Discount
+				bill.ShippingFee = input.ShippingFee
+				bill.Total = total
+				if input.Slip != nil {
+					bill.Slip = *input.Slip
+				}
+
+				if txErr := tx.Save(&bill).Error; txErr != nil {
+					return txErr
+				}
+
+				bill.Items = billItems
+
+				return nil
+			}); err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			switch e {
+			case exception.ErrRecordNotFound:
+				err = exception.ErrRecordNotFound
+			case exception.ErrPriceNotConfigured:
+				err = exception.ErrPriceNotConfigured
+			default:
+				err = e.(error)
+				// Logging
+				r.logger.Error(err.Error())
+				sentry.CaptureException(err)
+				exception.SqlErrorMessage = err.Error()
+				err = exception.ErrDbQueryStatement
+			}
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return bill, err
+	}
+
+	// Reload with Store + Items.Product preloaded to match the shape
+	// responses.BillDetailResponse.Make expects.
+	if err = r.db.Preload("Store").Preload("Items.Product").First(&bill, bill.ID).Error; err != nil {
 		return bill, err
 	}
 
