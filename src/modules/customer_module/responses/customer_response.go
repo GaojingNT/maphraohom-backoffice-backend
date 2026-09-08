@@ -1,0 +1,68 @@
+package responses
+
+import "maphraohom.app/maphraohom-backoffice/src/models"
+
+type (
+	// CustomerListItem is the shape returned by GET /customers.
+	CustomerListItem struct {
+		ID    int    `json:"id"`
+		Name  string `json:"name"`
+		Phone string `json:"phone"`
+	}
+
+	// CustomerDetailResponse is the shape returned by GET /customers/:id.
+	CustomerDetailResponse struct {
+		ID        int    `json:"id"`
+		Name      string `json:"name"`
+		Phone     string `json:"phone"`
+		CreatedAt string `json:"createdAt"`
+		UpdatedAt string `json:"updatedAt"`
+	}
+
+	// CustomerAddressItem is the shape returned by GET /customers/:id/addresses.
+	CustomerAddressItem struct {
+		ID        int    `json:"id"`
+		Address   string `json:"address"`
+		Label     string `json:"label,omitempty"`
+		IsDefault bool   `json:"isDefault"`
+		CreatedAt string `json:"createdAt"`
+		UpdatedAt string `json:"updatedAt"`
+	}
+)
+
+func (CustomerListItem) Collection(customers []models.Customer) []CustomerListItem {
+	items := make([]CustomerListItem, 0, len(customers))
+	for _, customer := range customers {
+		items = append(items, CustomerListItem{
+			ID:    customer.ID,
+			Name:  customer.Name,
+			Phone: customer.Phone,
+		})
+	}
+	return items
+}
+
+func (response *CustomerDetailResponse) Make(customer models.Customer) *CustomerDetailResponse {
+	return &CustomerDetailResponse{
+		ID:        customer.ID,
+		Name:      customer.Name,
+		Phone:     customer.Phone,
+		CreatedAt: customer.CreatedAt.Format("2006-01-02 15:04:05"),
+		UpdatedAt: customer.UpdatedAt.Format("2006-01-02 15:04:05"),
+	}
+}
+
+func (CustomerAddressItem) Collection(addresses []models.CustomerAddress) []CustomerAddressItem {
+	items := make([]CustomerAddressItem, 0, len(addresses))
+	for _, address := range addresses {
+		items = append(items, CustomerAddressItem{
+			ID:        address.ID,
+			Address:   address.Address,
+			Label:     address.Label,
+			IsDefault: address.IsDefault,
+			CreatedAt: address.CreatedAt.Format("2006-01-02 15:04:05"),
+			UpdatedAt: address.UpdatedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+	return items
+}

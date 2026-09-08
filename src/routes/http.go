@@ -18,7 +18,9 @@ import (
 	"maphraohom.app/maphraohom-backoffice/src/middlewares"
 	"maphraohom.app/maphraohom-backoffice/src/modules/auth_module"
 	"maphraohom.app/maphraohom-backoffice/src/modules/bill_module"
+	"maphraohom.app/maphraohom-backoffice/src/modules/customer_module"
 	"maphraohom.app/maphraohom-backoffice/src/modules/healthcheck_module"
+	"maphraohom.app/maphraohom-backoffice/src/modules/store_module"
 	"maphraohom.app/maphraohom-backoffice/src/modules/user_module"
 
 	// swagger handler
@@ -66,4 +68,6 @@ func HTTPRoutes(s *http_server.HttpServer) {
 	auth_module.NewModule().Routes(api, middleware)
 	user_module.NewModule().Routes(api, middleware)
 	bill_module.NewModule().Routes(api, middleware)
+	store_module.NewModule().Routes(api, middleware)
+	customer_module.NewModule().Routes(api, middleware)
 }
