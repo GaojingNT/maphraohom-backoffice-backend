@@ -4,6 +4,7 @@ type CreateBill struct {
 	StoreID         int     `form:"storeId" validate:"required"`
 	CustomerName    string  `form:"customerName" validate:"required"`
 	CustomerAddress string  `form:"customerAddress" validate:"required"`
+	CustomerPhone   string  `form:"customerPhone"`
 	Discount        float64 `form:"discount"`
 	ShippingFee     float64 `form:"shippingFee"`
 
@@ -27,6 +28,7 @@ type UpdateBill struct {
 	StoreID         int     `form:"storeId" validate:"required"`
 	CustomerName    string  `form:"customerName" validate:"required"`
 	CustomerAddress string  `form:"customerAddress" validate:"required"`
+	CustomerPhone   string  `form:"customerPhone"`
 	Discount        float64 `form:"discount"`
 	ShippingFee     float64 `form:"shippingFee"`
 	Items           string  `form:"items" validate:"required"`

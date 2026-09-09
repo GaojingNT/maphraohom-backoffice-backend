@@ -33,6 +33,7 @@ type CreateBillInput struct {
 	StoreID         int
 	CustomerName    string
 	CustomerAddress string
+	CustomerPhone   string
 	Discount        float64
 	ShippingFee     float64
 	Slip            string
@@ -48,6 +49,7 @@ type UpdateBillInput struct {
 	StoreID         int
 	CustomerName    string
 	CustomerAddress string
+	CustomerPhone   string
 	Discount        float64
 	ShippingFee     float64
 	Slip            *string
@@ -256,8 +258,8 @@ func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (mode
 				}
 
 				// Resolve (or create) the customer, keeping its default address
-				// up to date with the latest one used.
-				customerID, txErr := r.resolveCustomer(tx, input.CustomerName, input.CustomerAddress)
+				// and phone up to date with the latest ones used.
+				customerID, txErr := r.resolveCustomer(tx, input.CustomerName, input.CustomerAddress, input.CustomerPhone)
 				if txErr != nil {
 					return txErr
 				}
@@ -269,6 +271,7 @@ func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (mode
 					ReceiptNo:       receiptNo,
 					CustomerName:    input.CustomerName,
 					CustomerAddress: input.CustomerAddress,
+					CustomerPhone:   input.CustomerPhone,
 					Discount:        input.Discount,
 					ShippingFee:     input.ShippingFee,
 					Total:           total,
@@ -369,7 +372,7 @@ func (r Repository) UpdateBill(ctx context.Context, id int, input UpdateBillInpu
 				total = total - input.Discount + input.ShippingFee
 
 				// Resolve (or create) the customer, same as create.
-				customerID, txErr := r.resolveCustomer(tx, input.CustomerName, input.CustomerAddress)
+				customerID, txErr := r.resolveCustomer(tx, input.CustomerName, input.CustomerAddress, input.CustomerPhone)
 				if txErr != nil {
 					return txErr
 				}
@@ -386,6 +389,7 @@ func (r Repository) UpdateBill(ctx context.Context, id int, input UpdateBillInpu
 				bill.CustomerID = &customerID
 				bill.CustomerName = input.CustomerName
 				bill.CustomerAddress = input.CustomerAddress
+				bill.CustomerPhone = input.CustomerPhone
 				bill.Discount = input.Discount
 				bill.ShippingFee = input.ShippingFee
 				bill.Total = total
@@ -438,17 +442,17 @@ func (r Repository) UpdateBill(ctx context.Context, id int, input UpdateBillInpu
 }
 
 // resolveCustomer finds a customer by exact name, creating the customer and/or
-// a new address when needed. If the name already exists but this address is
-// new, a new CustomerAddress row is added and marked as the default (the one
-// used to prefill future bills); an exact name+address match is left as-is.
-func (r Repository) resolveCustomer(tx *gorm.DB, name string, address string) (int, error) {
+// new address/phone records when needed. The address and phone are stored as
+// snapshots on the bill itself; this function keeps the customer_addresses and
+// customer_phones tables in sync so future bills can prefill from them.
+func (r Repository) resolveCustomer(tx *gorm.DB, name string, address string, phone string) (int, error) {
 	var customer models.Customer
 	err := tx.Where("name = ?", name).First(&customer).Error
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return 0, err
 	}
 
-	// New customer: create it plus its first (default) address.
+	// New customer: create with first (default) address and phone.
 	if err == gorm.ErrRecordNotFound {
 		customer = models.Customer{Name: name}
 		if err = tx.Create(&customer).Error; err != nil {
@@ -463,33 +467,61 @@ func (r Repository) resolveCustomer(tx *gorm.DB, name string, address string) (i
 			return 0, err
 		}
 
+		if phone != "" {
+			if err = tx.Create(&models.CustomerPhone{
+				CustomerID: customer.ID,
+				Phone:      phone,
+				IsDefault:  true,
+			}).Error; err != nil {
+				return 0, err
+			}
+		}
+
 		return customer.ID, nil
 	}
 
-	// Existing customer: check whether this address is already on file.
+	// Existing customer — sync address.
 	var existingAddress models.CustomerAddress
 	err = tx.Where("customer_id = ? AND address = ?", customer.ID, address).First(&existingAddress).Error
-	if err == nil {
-		// Address already exists for this customer — nothing to do.
-		return customer.ID, nil
-	}
-	if err != gorm.ErrRecordNotFound {
+	if err != nil && err != gorm.ErrRecordNotFound {
 		return 0, err
+	}
+	if err == gorm.ErrRecordNotFound {
+		if err = tx.Model(&models.CustomerAddress{}).
+			Where("customer_id = ?", customer.ID).
+			Update("is_default", false).Error; err != nil {
+			return 0, err
+		}
+		if err = tx.Create(&models.CustomerAddress{
+			CustomerID: customer.ID,
+			Address:    address,
+			IsDefault:  true,
+		}).Error; err != nil {
+			return 0, err
+		}
 	}
 
-	// New address for an existing customer — add it and make it the default.
-	if err = tx.Model(&models.CustomerAddress{}).
-		Where("customer_id = ?", customer.ID).
-		Update("is_default", false).Error; err != nil {
-		return 0, err
-	}
-
-	if err = tx.Create(&models.CustomerAddress{
-		CustomerID: customer.ID,
-		Address:    address,
-		IsDefault:  true,
-	}).Error; err != nil {
-		return 0, err
+	// Existing customer — sync phone (only when a phone was provided).
+	if phone != "" {
+		var existingPhone models.CustomerPhone
+		err = tx.Where("customer_id = ? AND phone = ?", customer.ID, phone).First(&existingPhone).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return 0, err
+		}
+		if err == gorm.ErrRecordNotFound {
+			if err = tx.Model(&models.CustomerPhone{}).
+				Where("customer_id = ?", customer.ID).
+				Update("is_default", false).Error; err != nil {
+				return 0, err
+			}
+			if err = tx.Create(&models.CustomerPhone{
+				CustomerID: customer.ID,
+				Phone:      phone,
+				IsDefault:  true,
+			}).Error; err != nil {
+				return 0, err
+			}
+		}
 	}
 
 	return customer.ID, nil

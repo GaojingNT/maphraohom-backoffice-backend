@@ -28,6 +28,15 @@ type (
 		CreatedAt string `json:"createdAt"`
 		UpdatedAt string `json:"updatedAt"`
 	}
+
+	// CustomerPhoneItem is the shape returned by GET /customers/:id/phones.
+	CustomerPhoneItem struct {
+		ID        int    `json:"id"`
+		Phone     string `json:"phone"`
+		IsDefault bool   `json:"isDefault"`
+		CreatedAt string `json:"createdAt"`
+		UpdatedAt string `json:"updatedAt"`
+	}
 )
 
 func (CustomerListItem) Collection(customers []models.Customer) []CustomerListItem {
@@ -62,6 +71,20 @@ func (CustomerAddressItem) Collection(addresses []models.CustomerAddress) []Cust
 			IsDefault: address.IsDefault,
 			CreatedAt: address.CreatedAt.Format("2006-01-02 15:04:05"),
 			UpdatedAt: address.UpdatedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+	return items
+}
+
+func (CustomerPhoneItem) Collection(phones []models.CustomerPhone) []CustomerPhoneItem {
+	items := make([]CustomerPhoneItem, 0, len(phones))
+	for _, phone := range phones {
+		items = append(items, CustomerPhoneItem{
+			ID:        phone.ID,
+			Phone:     phone.Phone,
+			IsDefault: phone.IsDefault,
+			CreatedAt: phone.CreatedAt.Format("2006-01-02 15:04:05"),
+			UpdatedAt: phone.UpdatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 	return items

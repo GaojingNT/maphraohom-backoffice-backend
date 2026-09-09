@@ -102,3 +102,27 @@ func (c Controller) GetCustomerAddresses(f *fiber.Ctx) error {
 	c.m.tracer.TraceEnd(span)
 	return f.Status(fiber.StatusOK).JSON(responseData)
 }
+
+// GetCustomerPhones lists a customer's phone numbers
+//
+//	@Summary		List a customer's phone numbers
+//	@Description	Get every phone number on file for this customer (default-first)
+//	@Tags			Customer Module (Version 1)
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		int	true	"customer id"
+//	@Success		200	{array}		responses.CustomerPhoneItem
+//	@Failure		500	{object}	exception.ErrorResponse
+//	@Router			/api/v1/customers/{id}/phones [get]
+func (c Controller) GetCustomerPhones(f *fiber.Ctx) error {
+	id, _ := f.ParamsInt("id")
+	ctx, span := c.m.tracer.TraceStart(f.Context(), "GetCustomerPhonesController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "GetCustomerPhones"), attribute.Int("id", id)))
+
+	responseData, err := c.customerService().GetCustomerPhones(ctx, id)
+	if err != nil {
+		return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
+	}
+
+	c.m.tracer.TraceEnd(span)
+	return f.Status(fiber.StatusOK).JSON(responseData)
+}

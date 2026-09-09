@@ -40,6 +40,7 @@ type (
 		ReceiptNo       int              `json:"receiptNo"`
 		CustomerName    string           `json:"customerName"`
 		CustomerAddress string           `json:"customerAddress"`
+		CustomerPhone   string           `json:"customerPhone"`
 		Discount        float64          `json:"discount"`
 		ShippingFee     float64          `json:"shippingFee"`
 		Total           float64          `json:"total"`
@@ -113,6 +114,7 @@ func (response *BillDetailResponse) Make(bill models.Bill) *BillDetailResponse {
 		ReceiptNo:       bill.ReceiptNo,
 		CustomerName:    bill.CustomerName,
 		CustomerAddress: bill.CustomerAddress,
+		CustomerPhone:   bill.CustomerPhone,
 		Discount:        bill.Discount,
 		ShippingFee:     bill.ShippingFee,
 		Total:           bill.Total,

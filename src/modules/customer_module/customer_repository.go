@@ -125,3 +125,38 @@ func (r Repository) GetCustomerAddresses(ctx context.Context, customerID int) ([
 
 	return addresses, nil
 }
+
+func (r Repository) GetCustomerPhones(ctx context.Context, customerID int) ([]models.CustomerPhone, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "GetCustomerPhonesRepository", trace.WithAttributes(attribute.String("repository", "GetCustomerPhones"), attribute.Int("customerId", customerID)))
+		phones       = make([]models.CustomerPhone, 0)
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.
+				Where("customer_id = ?", customerID).
+				Order("is_default DESC, id DESC").
+				Find(&phones).Error; err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			err = e.(error)
+			r.logger.Error(err.Error())
+			sentry.CaptureException(err)
+			exception.SqlErrorMessage = err.Error()
+			err = exception.ErrDbQueryStatement
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return phones, nil
+}

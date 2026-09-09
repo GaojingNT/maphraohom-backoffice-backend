@@ -51,3 +51,17 @@ func (s Service) GetCustomerAddresses(ctx context.Context, customerID int) ([]re
 
 	return responses.CustomerAddressItem{}.Collection(addresses), nil
 }
+
+func (s Service) GetCustomerPhones(ctx context.Context, customerID int) ([]responses.CustomerPhoneItem, error) {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "GetCustomerPhonesService", trace.WithAttributes(attribute.String("service", "GetCustomerPhones")))
+
+	phones, err := s.customerRepository().GetCustomerPhones(ctx, customerID)
+
+	s.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return responses.CustomerPhoneItem{}.Collection(phones), nil
+}

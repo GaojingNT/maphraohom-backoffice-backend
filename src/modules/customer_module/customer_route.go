@@ -13,4 +13,5 @@ func (m module) Routes(route fiber.Router, middleware *middlewares.Middleware) {
 	customer.Get("", func(c *fiber.Ctx) error { return m.Controller().GetCustomers(c) })
 	customer.Get(":id", func(c *fiber.Ctx) error { return m.Controller().GetCustomer(c) })
 	customer.Get(":id/addresses", func(c *fiber.Ctx) error { return m.Controller().GetCustomerAddresses(c) })
+	customer.Get(":id/phones", func(c *fiber.Ctx) error { return m.Controller().GetCustomerPhones(c) })
 }

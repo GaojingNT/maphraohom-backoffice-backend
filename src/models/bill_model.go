@@ -20,10 +20,11 @@ type Bill struct {
 	ReceiptNo int `json:"receiptNo" gorm:"column:receipt_no;not null;"`
 
 	// Snapshots taken at the time the bill was issued — intentionally not
-	// kept in sync with Customer, since old bills must keep the address
-	// that was valid when they were issued.
+	// kept in sync with Customer, since old bills must keep the values
+	// that were valid when they were issued.
 	CustomerName    string `json:"customerName" gorm:"column:customer_name;size:255;"`
 	CustomerAddress string `json:"customerAddress" gorm:"column:customer_address;size:255;"`
+	CustomerPhone   string `json:"customerPhone" gorm:"column:customer_phone;size:50;"`
 
 	Discount    float64 `json:"discount" gorm:"column:discount;not null;default:0;"`
 	ShippingFee float64 `json:"shippingFee" gorm:"column:shipping_fee;not null;default:0;"`
