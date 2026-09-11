@@ -160,3 +160,153 @@ func (r Repository) GetCustomerPhones(ctx context.Context, customerID int) ([]mo
 
 	return phones, nil
 }
+
+func (r Repository) CreateCustomer(ctx context.Context, name string) (models.Customer, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "CreateCustomerRepository", trace.WithAttributes(attribute.String("repository", "CreateCustomer")))
+		customer     = models.Customer{Name: name}
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Create(&customer).Error; err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			err = e.(error)
+			r.logger.Error(err.Error())
+			sentry.CaptureException(err)
+			exception.SqlErrorMessage = err.Error()
+			err = exception.ErrDbQueryStatement
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return customer, err
+	}
+
+	return customer, nil
+}
+
+// CreateCustomerAddress adds a new address for a customer. When isDefault is
+// true, every other address of this customer is demoted first so at most
+// one stays default.
+func (r Repository) CreateCustomerAddress(ctx context.Context, customerID int, address string, label string, isDefault bool) (models.CustomerAddress, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "CreateCustomerAddressRepository", trace.WithAttributes(attribute.String("repository", "CreateCustomerAddress"), attribute.Int("customerId", customerID)))
+		record       models.CustomerAddress
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Transaction(func(tx *gorm.DB) error {
+				if txErr := tx.First(&models.Customer{}, customerID).Error; txErr != nil {
+					return txErr
+				}
+
+				if isDefault {
+					if txErr := tx.Model(&models.CustomerAddress{}).
+						Where("customer_id = ?", customerID).
+						Update("is_default", false).Error; txErr != nil {
+						return txErr
+					}
+				}
+
+				record = models.CustomerAddress{
+					CustomerID: customerID,
+					Address:    address,
+					Label:      label,
+					IsDefault:  isDefault,
+				}
+				return tx.Create(&record).Error
+			}); err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			if err == gorm.ErrRecordNotFound {
+				err = exception.ErrRecordNotFound
+			} else {
+				err = e.(error)
+				r.logger.Error(err.Error())
+				sentry.CaptureException(err)
+				exception.SqlErrorMessage = err.Error()
+				err = exception.ErrDbQueryStatement
+			}
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return record, err
+	}
+
+	return record, nil
+}
+
+// CreateCustomerPhone adds a new phone number for a customer. When isDefault
+// is true, every other phone of this customer is demoted first so at most
+// one stays default.
+func (r Repository) CreateCustomerPhone(ctx context.Context, customerID int, phone string, label string, isDefault bool) (models.CustomerPhone, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "CreateCustomerPhoneRepository", trace.WithAttributes(attribute.String("repository", "CreateCustomerPhone"), attribute.Int("customerId", customerID)))
+		record       models.CustomerPhone
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Transaction(func(tx *gorm.DB) error {
+				if txErr := tx.First(&models.Customer{}, customerID).Error; txErr != nil {
+					return txErr
+				}
+
+				if isDefault {
+					if txErr := tx.Model(&models.CustomerPhone{}).
+						Where("customer_id = ?", customerID).
+						Update("is_default", false).Error; txErr != nil {
+						return txErr
+					}
+				}
+
+				record = models.CustomerPhone{
+					CustomerID: customerID,
+					Phone:      phone,
+					Label:      label,
+					IsDefault:  isDefault,
+				}
+				return tx.Create(&record).Error
+			}); err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			if err == gorm.ErrRecordNotFound {
+				err = exception.ErrRecordNotFound
+			} else {
+				err = e.(error)
+				r.logger.Error(err.Error())
+				sentry.CaptureException(err)
+				exception.SqlErrorMessage = err.Error()
+				err = exception.ErrDbQueryStatement
+			}
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return record, err
+	}
+
+	return record, nil
+}

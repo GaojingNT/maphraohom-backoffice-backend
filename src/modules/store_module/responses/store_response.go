@@ -19,13 +19,16 @@ type (
 		UpdatedAt string `json:"updatedAt"`
 	}
 
-	// StoreProductPriceItem is one product's currently effective price at a
-	// store, returned by GET /stores/:id/products and .../products/:productId.
+	// StoreProductPriceItem is one product's currently resolved price at a
+	// store (promotion price if one is active, else the base price),
+	// returned by GET /stores/:id/products and .../products/:productId.
 	StoreProductPriceItem struct {
-		ProductID     int     `json:"productId"`
-		ProductName   string  `json:"productName"`
-		Price         float64 `json:"price"`
-		EffectiveFrom string  `json:"effectiveFrom"`
+		ProductID   int     `json:"productId"`
+		ProductName string  `json:"productName"`
+		Unit        string  `json:"unit"`
+		Price       float64 `json:"price"`
+		IsPromotion bool    `json:"isPromotion"`
+		PromotionID *int    `json:"promotionId,omitempty"`
 	}
 )
 
@@ -51,24 +54,42 @@ func (response *StoreDetailResponse) Make(store models.Store) *StoreDetailRespon
 	}
 }
 
-func (StoreProductPriceItem) Make(price models.StoreProductPrice) StoreProductPriceItem {
-	productName := ""
+// Make builds one product's resolved price. When promotion is non-nil and
+// carries a special price for this product, that price wins; otherwise the
+// store's base price is used.
+func (StoreProductPriceItem) Make(price models.StoreProductPrice, promotion *models.Promotion) StoreProductPriceItem {
+	productName, unit := "", ""
 	if price.Product != nil {
 		productName = price.Product.Name
+		unit = price.Product.Unit
 	}
 
-	return StoreProductPriceItem{
-		ProductID:     price.ProductID,
-		ProductName:   productName,
-		Price:         price.Price,
-		EffectiveFrom: price.EffectiveFrom.Format("2006-01-02 15:04:05"),
+	item := StoreProductPriceItem{
+		ProductID:   price.ProductID,
+		ProductName: productName,
+		Unit:        unit,
+		Price:       price.Price,
 	}
+
+	if promotion != nil {
+		for _, promoPrice := range promotion.Prices {
+			if promoPrice.ProductID == price.ProductID {
+				promotionID := promotion.ID
+				item.Price = promoPrice.Price
+				item.IsPromotion = true
+				item.PromotionID = &promotionID
+				break
+			}
+		}
+	}
+
+	return item
 }
 
-func (item StoreProductPriceItem) Collection(prices []models.StoreProductPrice) []StoreProductPriceItem {
+func (item StoreProductPriceItem) Collection(prices []models.StoreProductPrice, promotion *models.Promotion) []StoreProductPriceItem {
 	items := make([]StoreProductPriceItem, 0, len(prices))
 	for _, price := range prices {
-		items = append(items, item.Make(price))
+		items = append(items, item.Make(price, promotion))
 	}
 	return items
 }

@@ -9,7 +9,7 @@ type CreateBill struct {
 	ShippingFee     float64 `form:"shippingFee"`
 
 	// Items is a JSON-encoded array of CreateBillItem, e.g.:
-	// [{"productId":1,"kilogram":2.5},{"productId":3,"kilogram":1.2}]
+	// [{"productId":1,"quantity":2.5},{"productId":3,"quantity":1.2}]
 	// (kept as a plain form field since multipart/form-data has no native
 	// array-of-objects encoding).
 	Items string `form:"items" validate:"required"`
@@ -17,7 +17,7 @@ type CreateBill struct {
 
 type CreateBillItem struct {
 	ProductID int     `json:"productId" validate:"required"`
-	Kilogram  float64 `json:"kilogram" validate:"required,gt=0"`
+	Quantity  float64 `json:"quantity" validate:"required,gt=0"`
 }
 
 // UpdateBill replaces a bill's editable fields and its full set of line

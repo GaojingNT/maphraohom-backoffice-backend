@@ -10,6 +10,9 @@ type CustomerPhone struct {
 
 	Phone string `json:"phone" gorm:"column:phone;size:50;not null;"`
 
+	// Label is an optional free-form tag, e.g. "มือถือ", "ไลน์".
+	Label string `json:"label,omitempty" gorm:"column:label;size:100;"`
+
 	// IsDefault marks the phone used to prefill new bills. Only one phone
 	// per customer may be default — enforced by the partial unique index above.
 	IsDefault bool `json:"isDefault" gorm:"column:is_default;not null;default:false;"`

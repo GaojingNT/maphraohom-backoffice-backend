@@ -14,4 +14,7 @@ func (m module) Routes(route fiber.Router, middleware *middlewares.Middleware) {
 	customer.Get(":id", func(c *fiber.Ctx) error { return m.Controller().GetCustomer(c) })
 	customer.Get(":id/addresses", func(c *fiber.Ctx) error { return m.Controller().GetCustomerAddresses(c) })
 	customer.Get(":id/phones", func(c *fiber.Ctx) error { return m.Controller().GetCustomerPhones(c) })
+	customer.Post("", func(c *fiber.Ctx) error { return m.Controller().CreateCustomer(c) })
+	customer.Post(":id/addresses", func(c *fiber.Ctx) error { return m.Controller().CreateCustomerAddress(c) })
+	customer.Post(":id/phones", func(c *fiber.Ctx) error { return m.Controller().CreateCustomerPhone(c) })
 }

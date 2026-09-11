@@ -33,6 +33,7 @@ type (
 	CustomerPhoneItem struct {
 		ID        int    `json:"id"`
 		Phone     string `json:"phone"`
+		Label     string `json:"label,omitempty"`
 		IsDefault bool   `json:"isDefault"`
 		CreatedAt string `json:"createdAt"`
 		UpdatedAt string `json:"updatedAt"`
@@ -61,31 +62,40 @@ func (response *CustomerDetailResponse) Make(customer models.Customer) *Customer
 	}
 }
 
-func (CustomerAddressItem) Collection(addresses []models.CustomerAddress) []CustomerAddressItem {
+func (CustomerAddressItem) Make(address models.CustomerAddress) CustomerAddressItem {
+	return CustomerAddressItem{
+		ID:        address.ID,
+		Address:   address.Address,
+		Label:     address.Label,
+		IsDefault: address.IsDefault,
+		CreatedAt: address.CreatedAt.Format("2006-01-02 15:04:05"),
+		UpdatedAt: address.UpdatedAt.Format("2006-01-02 15:04:05"),
+	}
+}
+
+func (item CustomerAddressItem) Collection(addresses []models.CustomerAddress) []CustomerAddressItem {
 	items := make([]CustomerAddressItem, 0, len(addresses))
 	for _, address := range addresses {
-		items = append(items, CustomerAddressItem{
-			ID:        address.ID,
-			Address:   address.Address,
-			Label:     address.Label,
-			IsDefault: address.IsDefault,
-			CreatedAt: address.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt: address.UpdatedAt.Format("2006-01-02 15:04:05"),
-		})
+		items = append(items, item.Make(address))
 	}
 	return items
 }
 
-func (CustomerPhoneItem) Collection(phones []models.CustomerPhone) []CustomerPhoneItem {
+func (CustomerPhoneItem) Make(phone models.CustomerPhone) CustomerPhoneItem {
+	return CustomerPhoneItem{
+		ID:        phone.ID,
+		Phone:     phone.Phone,
+		Label:     phone.Label,
+		IsDefault: phone.IsDefault,
+		CreatedAt: phone.CreatedAt.Format("2006-01-02 15:04:05"),
+		UpdatedAt: phone.UpdatedAt.Format("2006-01-02 15:04:05"),
+	}
+}
+
+func (item CustomerPhoneItem) Collection(phones []models.CustomerPhone) []CustomerPhoneItem {
 	items := make([]CustomerPhoneItem, 0, len(phones))
 	for _, phone := range phones {
-		items = append(items, CustomerPhoneItem{
-			ID:        phone.ID,
-			Phone:     phone.Phone,
-			IsDefault: phone.IsDefault,
-			CreatedAt: phone.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt: phone.UpdatedAt.Format("2006-01-02 15:04:05"),
-		})
+		items = append(items, item.Make(phone))
 	}
 	return items
 }

@@ -21,6 +21,8 @@ import (
 	"maphraohom.app/maphraohom-backoffice/src/modules/customer_module"
 	"maphraohom.app/maphraohom-backoffice/src/modules/file_module"
 	"maphraohom.app/maphraohom-backoffice/src/modules/healthcheck_module"
+	"maphraohom.app/maphraohom-backoffice/src/modules/product_module"
+	"maphraohom.app/maphraohom-backoffice/src/modules/promotion_module"
 	"maphraohom.app/maphraohom-backoffice/src/modules/store_module"
 	"maphraohom.app/maphraohom-backoffice/src/modules/user_module"
 
@@ -71,5 +73,7 @@ func HTTPRoutes(s *http_server.HttpServer) {
 	bill_module.NewModule().Routes(api, middleware)
 	store_module.NewModule().Routes(api, middleware)
 	customer_module.NewModule().Routes(api, middleware)
+	product_module.NewModule().Routes(api, middleware)
+	promotion_module.NewModule().Routes(api, middleware)
 	file_module.NewModule().Routes(api, middleware)
 }

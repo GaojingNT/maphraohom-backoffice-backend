@@ -42,6 +42,12 @@ func (s Service) GetStoreProducts(ctx context.Context, storeID int) ([]responses
 	ctx, childSpan := s.tracer.TraceStart(ctx, "GetStoreProductsService", trace.WithAttributes(attribute.String("service", "GetStoreProducts")))
 
 	prices, err := s.storeRepository().GetStoreProducts(ctx, storeID)
+	if err != nil {
+		s.tracer.TraceEnd(childSpan)
+		return nil, err
+	}
+
+	promotion, err := s.storeRepository().GetActivePromotion(ctx, storeID)
 
 	s.tracer.TraceEnd(childSpan)
 
@@ -49,13 +55,13 @@ func (s Service) GetStoreProducts(ctx context.Context, storeID int) ([]responses
 		return nil, err
 	}
 
-	return responses.StoreProductPriceItem{}.Collection(prices), nil
+	return responses.StoreProductPriceItem{}.Collection(prices, promotion), nil
 }
 
 func (s Service) GetStoreProduct(ctx context.Context, storeID int, productID int) (*responses.StoreProductPriceItem, error) {
 	ctx, childSpan := s.tracer.TraceStart(ctx, "GetStoreProductService", trace.WithAttributes(attribute.String("service", "GetStoreProduct")))
 
-	price, err := s.storeRepository().GetStoreProduct(ctx, storeID, productID)
+	product, resolved, err := s.storeRepository().GetStoreProduct(ctx, storeID, productID)
 
 	s.tracer.TraceEnd(childSpan)
 
@@ -63,6 +69,13 @@ func (s Service) GetStoreProduct(ctx context.Context, storeID int, productID int
 		return nil, err
 	}
 
-	item := responses.StoreProductPriceItem{}.Make(price)
+	item := responses.StoreProductPriceItem{
+		ProductID:   product.ID,
+		ProductName: product.Name,
+		Unit:        product.Unit,
+		Price:       resolved.Price,
+		IsPromotion: resolved.IsPromotion,
+		PromotionID: resolved.PromotionID,
+	}
 	return &item, nil
 }

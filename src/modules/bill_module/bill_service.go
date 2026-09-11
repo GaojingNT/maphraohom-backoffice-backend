@@ -62,7 +62,7 @@ func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill, items []d
 	for _, item := range items {
 		inputItems = append(inputItems, CreateBillItemInput{
 			ProductID: item.ProductID,
-			Kilogram:  item.Kilogram,
+			Quantity:  item.Quantity,
 		})
 	}
 
@@ -110,7 +110,7 @@ func (s Service) UpdateBill(ctx context.Context, id int, dto *dtos.UpdateBill, i
 	for _, item := range items {
 		inputItems = append(inputItems, CreateBillItemInput{
 			ProductID: item.ProductID,
-			Kilogram:  item.Kilogram,
+			Quantity:  item.Quantity,
 		})
 	}
 

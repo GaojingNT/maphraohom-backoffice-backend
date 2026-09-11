@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
+	"maphraohom.app/maphraohom-backoffice/internal/pricing"
 	"maphraohom.app/maphraohom-backoffice/internal/utils"
 	"maphraohom.app/maphraohom-backoffice/pkg/database/paginator"
 	"maphraohom.app/maphraohom-backoffice/src/models"
@@ -22,7 +23,7 @@ const MaxReceiptNoPerBook = 50
 // CreateBillItemInput is one line item of a create-bill request.
 type CreateBillItemInput struct {
 	ProductID int
-	Kilogram  float64
+	Quantity  float64
 }
 
 // CreateBillInput carries the already-validated fields the service resolved
@@ -210,28 +211,27 @@ func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (mode
 					return txErr
 				}
 
-				// Price each line item from the store's currently effective price.
+				// Price each line item, preferring an active promotion over the
+				// store's base price (see internal/pricing).
 				now := time.Now()
 				billItems := make([]models.BillItem, 0, len(input.Items))
 				var total float64
 				for _, item := range input.Items {
-					var price models.StoreProductPrice
-					if txErr := tx.
-						Where("store_id = ? AND product_id = ? AND effective_from <= ?", input.StoreID, item.ProductID, now).
-						Order("effective_from DESC").
-						First(&price).Error; txErr != nil {
+					resolved, txErr := pricing.ResolveOne(tx, input.StoreID, item.ProductID, now)
+					if txErr != nil {
 						if txErr == gorm.ErrRecordNotFound {
 							return exception.ErrPriceNotConfigured
 						}
 						return txErr
 					}
 
-					subtotal := item.Kilogram * price.Price
+					subtotal := item.Quantity * resolved.Price
 					billItems = append(billItems, models.BillItem{
-						ProductID: item.ProductID,
-						Kilogram:  item.Kilogram,
-						Price:     price.Price,
-						Subtotal:  subtotal,
+						ProductID:   item.ProductID,
+						PromotionID: resolved.PromotionID,
+						Quantity:    item.Quantity,
+						Price:       resolved.Price,
+						Subtotal:    subtotal,
 					})
 					total += subtotal
 				}
@@ -343,29 +343,28 @@ func (r Repository) UpdateBill(ctx context.Context, id int, input UpdateBillInpu
 					return txErr
 				}
 
-				// Price each line item from the store's currently effective price.
+				// Price each line item, preferring an active promotion over the
+				// store's base price, same as create (re-resolved at edit time).
 				now := time.Now()
 				billItems := make([]models.BillItem, 0, len(input.Items))
 				var total float64
 				for _, item := range input.Items {
-					var price models.StoreProductPrice
-					if txErr := tx.
-						Where("store_id = ? AND product_id = ? AND effective_from <= ?", input.StoreID, item.ProductID, now).
-						Order("effective_from DESC").
-						First(&price).Error; txErr != nil {
+					resolved, txErr := pricing.ResolveOne(tx, input.StoreID, item.ProductID, now)
+					if txErr != nil {
 						if txErr == gorm.ErrRecordNotFound {
 							return exception.ErrPriceNotConfigured
 						}
 						return txErr
 					}
 
-					subtotal := item.Kilogram * price.Price
+					subtotal := item.Quantity * resolved.Price
 					billItems = append(billItems, models.BillItem{
-						BillID:    bill.ID,
-						ProductID: item.ProductID,
-						Kilogram:  item.Kilogram,
-						Price:     price.Price,
-						Subtotal:  subtotal,
+						BillID:      bill.ID,
+						ProductID:   item.ProductID,
+						PromotionID: resolved.PromotionID,
+						Quantity:    item.Quantity,
+						Price:       resolved.Price,
+						Subtotal:    subtotal,
 					})
 					total += subtotal
 				}

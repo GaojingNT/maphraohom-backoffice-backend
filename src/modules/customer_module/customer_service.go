@@ -7,6 +7,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"maphraohom.app/maphraohom-backoffice/pkg/database/paginator"
 	"maphraohom.app/maphraohom-backoffice/src/models"
+	"maphraohom.app/maphraohom-backoffice/src/modules/customer_module/dtos"
 	"maphraohom.app/maphraohom-backoffice/src/modules/customer_module/responses"
 )
 
@@ -64,4 +65,48 @@ func (s Service) GetCustomerPhones(ctx context.Context, customerID int) ([]respo
 	}
 
 	return responses.CustomerPhoneItem{}.Collection(phones), nil
+}
+
+func (s Service) CreateCustomer(ctx context.Context, dto *dtos.CreateCustomer) (*responses.CustomerDetailResponse, error) {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "CreateCustomerService", trace.WithAttributes(attribute.String("service", "CreateCustomer")))
+
+	customer, err := s.customerRepository().CreateCustomer(ctx, dto.Name)
+
+	s.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return new(responses.CustomerDetailResponse).Make(customer), nil
+}
+
+func (s Service) CreateCustomerAddress(ctx context.Context, customerID int, dto *dtos.CreateCustomerAddress) (*responses.CustomerAddressItem, error) {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "CreateCustomerAddressService", trace.WithAttributes(attribute.String("service", "CreateCustomerAddress")))
+
+	address, err := s.customerRepository().CreateCustomerAddress(ctx, customerID, dto.Address, dto.Label, dto.IsDefault)
+
+	s.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	item := responses.CustomerAddressItem{}.Make(address)
+	return &item, nil
+}
+
+func (s Service) CreateCustomerPhone(ctx context.Context, customerID int, dto *dtos.CreateCustomerPhone) (*responses.CustomerPhoneItem, error) {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "CreateCustomerPhoneService", trace.WithAttributes(attribute.String("service", "CreateCustomerPhone")))
+
+	phone, err := s.customerRepository().CreateCustomerPhone(ctx, customerID, dto.Phone, dto.Label, dto.IsDefault)
+
+	s.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	item := responses.CustomerPhoneItem{}.Make(phone)
+	return &item, nil
 }

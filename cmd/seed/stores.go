@@ -2,73 +2,80 @@ package main
 
 import (
 	"log"
-	"time"
 
 	"gorm.io/gorm"
 	"maphraohom.app/maphraohom-backoffice/src/models"
 )
 
-type productPrice struct {
-	Name  string
-	Price float64
-}
+// storeKey identifies a seeded store for cross-referencing in promotions.go.
+type storeKey string
+
+const (
+	storeAmpawa   storeKey = "ampawa"
+	storeHomlamun storeKey = "homlamun"
+)
 
 type storeSeed struct {
-	Name     string
-	Products []productPrice
+	Key string
+	Name string
+
+	// BasePrice applies to every product except น้ำมะพร้าว, which is sold
+	// by the bottle and priced separately via BottlePrice.
+	BasePrice   float64
+	BottlePrice float64
 }
 
-// storeSeeds defines each store and its per-product prices.
+// storeSeeds defines each store and its per-product base prices.
 var storeSeeds = []storeSeed{
 	{
-		Name: "มะพร้าวหอมแปรรูป อัมพวา",
-		Products: []productPrice{
-			{"เนื้อหั่นเส้น", 80},
-			{"เนื้อหั่นชิ้น", 80},
-			{"เนื้อเบ้าพับ", 80},
-			{"เนื้อขูดฝอย", 80},
-			{"เนื้อริ้ว", 80},
-			{"น้ำมะพร้าว", 50},
-		},
+		Key:         string(storeAmpawa),
+		Name:        "มะพร้าวหอมอัมพวา",
+		BasePrice:   80,
+		BottlePrice: 20,
 	},
 	{
-		Name: "Maphraohom Ampawa มะพร้าวหอมอัมพวา",
-		Products: []productPrice{
-			{"เนื้อหั่นเส้น", 100},
-			{"เนื้อหั่นชิ้น", 100},
-			{"เนื้อเบ้าพับ", 100},
-			{"เนื้อขูดฝอย", 100},
-			{"เนื้อริ้ว", 100},
-			{"น้ำมะพร้าว", 70},
-		},
+		Key:         string(storeHomlamun),
+		Name:        "หอมละมุน มะพร้าวน้ำหอม",
+		BasePrice:   100,
+		BottlePrice: 25,
 	},
 }
 
-// seedStores creates each store and its store-product prices.
-func seedStores(db *gorm.DB, productMap map[string]uint) {
-	now := time.Now()
+// seedStores creates each store and its store-product prices, returning a
+// store key → ID map for promotion seeding.
+func seedStores(db *gorm.DB, productMap map[string]uint) map[string]uint {
+	storeMap := make(map[string]uint, len(storeSeeds))
+
 	for _, ss := range storeSeeds {
 		store := models.Store{Name: ss.Name}
 		if err := db.Create(&store).Error; err != nil {
 			log.Fatalf("[Seed] store %q: %v", ss.Name, err)
 		}
+		storeMap[ss.Key] = uint(store.ID)
 		log.Printf("[Seed] Store: #%d %s", store.ID, store.Name)
 
-		for _, pp := range ss.Products {
-			productID, ok := productMap[pp.Name]
+		for _, ps := range productSeeds {
+			productID, ok := productMap[ps.Name]
 			if !ok {
-				log.Fatalf("[Seed] product %q not found", pp.Name)
+				log.Fatalf("[Seed] product %q not found", ps.Name)
 			}
-			price := models.StoreProductPrice{
-				StoreID:       store.ID,
-				ProductID:     int(productID),
-				Price:         pp.Price,
-				EffectiveFrom: now,
+
+			price := ss.BasePrice
+			if ps.Unit == "ขวด" {
+				price = ss.BottlePrice
 			}
-			if err := db.Create(&price).Error; err != nil {
-				log.Fatalf("[Seed] price store %q / product %q: %v", ss.Name, pp.Name, err)
+
+			spp := models.StoreProductPrice{
+				StoreID:   store.ID,
+				ProductID: int(productID),
+				Price:     price,
 			}
-			log.Printf("[Seed]   Price: store #%d × product #%d (%s) = %.2f ฿", store.ID, productID, pp.Name, pp.Price)
+			if err := db.Create(&spp).Error; err != nil {
+				log.Fatalf("[Seed] price store %q / product %q: %v", ss.Name, ps.Name, err)
+			}
+			log.Printf("[Seed]   Price: store #%d × product #%d (%s) = %.2f ฿", store.ID, productID, ps.Name, price)
 		}
 	}
+
+	return storeMap
 }

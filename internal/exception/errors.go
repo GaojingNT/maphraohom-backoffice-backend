@@ -6,6 +6,8 @@ import "github.com/rotisserie/eris"
 var (
 	// Sql error message
 	SqlErrorMessage string
+	// Promotion overlap detail message (names the conflicting promotion)
+	PromotionOverlapMessage string
 	// Server errors
 	ErrInternalServerError            = eris.New("internal server error")
 	ErrUnauthorized                   = eris.New("unauthorized")
@@ -20,6 +22,7 @@ var (
 	ErrDbQueryStatement   = eris.New("database query statement error")
 	ErrRecordNotFound     = eris.New("record not found")
 	ErrPriceNotConfigured = eris.New("price not configured for this store and product")
+	ErrPromotionOverlap   = eris.New("promotion overlaps with an existing active promotion for this store")
 	// Auth errors
 	ErrInvalidLoginCredential    = eris.New("invalid login credential")
 	ErrInvalidResetPasswordToken = eris.New("invalid reset password token")
@@ -41,6 +44,7 @@ var (
 	DbQueryStatementResponseError   = &ErrorResponse{Code: "DB-1001", Message: "database query statement error"}
 	RecordNotFoundResponseError     = &ErrorResponse{Code: "DB-1002", Message: "record not found"}
 	PriceNotConfiguredResponseError = &ErrorResponse{Code: "DB-1003", Message: "price not configured for this store and product"}
+	PromotionOverlapResponseError   = &ErrorResponse{Code: "DB-1004", Message: "promotion overlaps with an existing active promotion for this store"}
 	// Auth error response messages
 	InvalidLoginCredentialResponseError    = &ErrorResponse{Code: "A-3001", Message: "invalid login credential"}
 	InvalidResetPasswordTokenResponseError = &ErrorResponse{Code: "A-3002", Message: "invalid reset password token"}

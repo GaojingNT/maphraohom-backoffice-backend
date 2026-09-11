@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
+	"maphraohom.app/maphraohom-backoffice/internal/pricing"
 	"maphraohom.app/maphraohom-backoffice/internal/utils"
 	"maphraohom.app/maphraohom-backoffice/pkg/database/paginator"
 	"maphraohom.app/maphraohom-backoffice/src/models"
@@ -92,13 +93,13 @@ func (r Repository) GetStoreByID(ctx context.Context, id int) (models.Store, err
 	return store, nil
 }
 
-// GetStoreProducts returns the currently effective price for every product
-// that has ever been priced at this store (one row per product — the one
-// with the latest effective_from that isn't in the future).
+// GetStoreProducts returns the store's base price for every product that
+// has one configured (one row per product — store_product_prices has a
+// unique (store_id, product_id) row, no history).
 func (r Repository) GetStoreProducts(ctx context.Context, storeID int) ([]models.StoreProductPrice, error) {
 	var (
 		_, childSpan = r.tracer.TraceStart(ctx, "GetStoreProductsRepository", trace.WithAttributes(attribute.String("repository", "GetStoreProducts"), attribute.Int("storeId", storeID)))
-		allPrices    = make([]models.StoreProductPrice, 0)
+		prices       = make([]models.StoreProductPrice, 0)
 		err          error
 	)
 
@@ -106,9 +107,9 @@ func (r Repository) GetStoreProducts(ctx context.Context, storeID int) ([]models
 		Try: func() {
 			if err = r.db.
 				Preload("Product").
-				Where("store_id = ? AND effective_from <= ?", storeID, time.Now()).
-				Order("product_id ASC, effective_from DESC").
-				Find(&allPrices).Error; err != nil {
+				Where("store_id = ?", storeID).
+				Order("product_id ASC").
+				Find(&prices).Error; err != nil {
 				utils.Throw(err)
 			}
 		},
@@ -128,36 +129,70 @@ func (r Repository) GetStoreProducts(ctx context.Context, storeID int) ([]models
 		return nil, err
 	}
 
-	// Keep only the newest row per product (allPrices is already ordered
-	// product_id ASC, effective_from DESC, so the first occurrence wins).
-	seen := make(map[int]bool, len(allPrices))
-	latest := make([]models.StoreProductPrice, 0, len(allPrices))
-	for _, price := range allPrices {
-		if seen[price.ProductID] {
-			continue
-		}
-		seen[price.ProductID] = true
-		latest = append(latest, price)
-	}
-
-	return latest, nil
+	return prices, nil
 }
 
-// GetStoreProduct returns one product's currently effective price at this store.
-func (r Repository) GetStoreProduct(ctx context.Context, storeID int, productID int) (models.StoreProductPrice, error) {
+// GetActivePromotion returns the store's currently active promotion, or nil
+// if none is active (not treated as an error).
+func (r Repository) GetActivePromotion(ctx context.Context, storeID int) (*models.Promotion, error) {
 	var (
-		_, childSpan = r.tracer.TraceStart(ctx, "GetStoreProductRepository", trace.WithAttributes(attribute.String("repository", "GetStoreProduct"), attribute.Int("storeId", storeID), attribute.Int("productId", productID)))
-		price        models.StoreProductPrice
+		_, childSpan = r.tracer.TraceStart(ctx, "GetActivePromotionRepository", trace.WithAttributes(attribute.String("repository", "GetActivePromotion"), attribute.Int("storeId", storeID)))
+		promotion    models.Promotion
+		notFound     bool
 		err          error
 	)
 
 	utils.Block{
 		Try: func() {
-			if err = r.db.
-				Preload("Product").
-				Where("store_id = ? AND product_id = ? AND effective_from <= ?", storeID, productID, time.Now()).
-				Order("effective_from DESC").
-				First(&price).Error; err != nil {
+			if promotion, err = pricing.ActivePromotion(r.db, storeID, time.Now()); err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			if err == gorm.ErrRecordNotFound {
+				notFound = true
+				err = nil
+			} else {
+				err = e.(error)
+				r.logger.Error(err.Error())
+				sentry.CaptureException(err)
+				exception.SqlErrorMessage = err.Error()
+				err = exception.ErrDbQueryStatement
+			}
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+	if notFound {
+		return nil, nil
+	}
+
+	return &promotion, nil
+}
+
+// GetStoreProduct returns one product's resolved price (promotion-first)
+// at this store, along with the product itself.
+func (r Repository) GetStoreProduct(ctx context.Context, storeID int, productID int) (models.Product, pricing.Resolved, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "GetStoreProductRepository", trace.WithAttributes(attribute.String("repository", "GetStoreProduct"), attribute.Int("storeId", storeID), attribute.Int("productId", productID)))
+		product      models.Product
+		resolved     pricing.Resolved
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.First(&product, productID).Error; err != nil {
+				utils.Throw(err)
+			}
+
+			resolved, err = pricing.ResolveOne(r.db, storeID, productID, time.Now())
+			if err != nil {
 				utils.Throw(err)
 			}
 		},
@@ -178,8 +213,8 @@ func (r Repository) GetStoreProduct(ctx context.Context, storeID int, productID 
 	r.tracer.TraceEnd(childSpan)
 
 	if err != nil {
-		return price, err
+		return product, resolved, err
 	}
 
-	return price, nil
+	return product, resolved, nil
 }

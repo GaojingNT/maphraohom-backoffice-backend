@@ -19,7 +19,7 @@ import (
 //
 //	@Summary		List bills
 //	@Description	Get bills (paginated) — id, storeId, storeName, receiptNo,
-//	@Description	customerName, customerAddress, total, totalKilogram, itemCount, createdAt
+//	@Description	customerName, customerAddress, total, totalQuantity, itemCount, createdAt
 //	@Tags			Bill Module (Version 1)
 //	@Accept			json
 //	@Produce		json
@@ -112,7 +112,7 @@ func (c Controller) GetBill(f *fiber.Ctx) error {
 //	@Param			storeId			formData	int		true	"store id"
 //	@Param			customerName	formData	string	true	"customer name"
 //	@Param			customerAddress	formData	string	true	"customer address"
-//	@Param			items			formData	string	true	"JSON array, e.g. [{\"productId\":1,\"kilogram\":2.5}]"
+//	@Param			items			formData	string	true	"JSON array, e.g. [{\"productId\":1,\"quantity\":2.5}]"
 //	@Param			discount		formData	number	false	"discount"
 //	@Param			shippingFee		formData	number	false	"shipping fee"
 //	@Param			slip			formData	file	false	"slip image"
@@ -180,7 +180,7 @@ func (c Controller) CreateBill(f *fiber.Ctx) error {
 //	@Param			storeId			formData	int		true	"store id"
 //	@Param			customerName	formData	string	true	"customer name"
 //	@Param			customerAddress	formData	string	true	"customer address"
-//	@Param			items			formData	string	true	"JSON array, e.g. [{\"productId\":1,\"kilogram\":2.5}]"
+//	@Param			items			formData	string	true	"JSON array, e.g. [{\"productId\":1,\"quantity\":2.5}]"
 //	@Param			discount		formData	number	false	"discount"
 //	@Param			shippingFee		formData	number	false	"shipping fee"
 //	@Param			slip			formData	file	false	"new slip image (replaces the existing one)"

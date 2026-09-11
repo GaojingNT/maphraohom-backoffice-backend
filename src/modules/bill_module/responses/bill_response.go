@@ -12,7 +12,7 @@ type (
 		CustomerName    string  `json:"customerName"`
 		CustomerAddress string  `json:"customerAddress"`
 		Total           float64 `json:"total"`
-		TotalKilogram   float64 `json:"totalKilogram"`
+		TotalQuantity   float64 `json:"totalQuantity"`
 		ItemCount       int     `json:"itemCount"`
 		CreatedAt       string  `json:"createdAt"`
 	}
@@ -22,9 +22,12 @@ type (
 		ID          int     `json:"id"`
 		ProductID   int     `json:"productId"`
 		ProductName string  `json:"productName"`
-		Kilogram    float64 `json:"kilogram"`
+		Unit        string  `json:"unit"`
+		Quantity    float64 `json:"quantity"`
 		Price       float64 `json:"price"`
 		Subtotal    float64 `json:"subtotal"`
+		IsPromotion bool    `json:"isPromotion"`
+		PromotionID *int    `json:"promotionId,omitempty"`
 	}
 
 	// BillDetailResponse is the shape returned by GET /bills/:id — every
@@ -54,9 +57,9 @@ type (
 func (BillListItem) Collection(bills []models.Bill) []BillListItem {
 	items := make([]BillListItem, 0, len(bills))
 	for _, bill := range bills {
-		var totalKilogram float64
+		var totalQuantity float64
 		for _, item := range bill.Items {
-			totalKilogram += item.Kilogram
+			totalQuantity += item.Quantity
 		}
 
 		storeName := ""
@@ -72,7 +75,7 @@ func (BillListItem) Collection(bills []models.Bill) []BillListItem {
 			CustomerName:    bill.CustomerName,
 			CustomerAddress: bill.CustomerAddress,
 			Total:           bill.Total,
-			TotalKilogram:   totalKilogram,
+			TotalQuantity:   totalQuantity,
 			ItemCount:       len(bill.Items),
 			CreatedAt:       bill.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
@@ -83,18 +86,22 @@ func (BillListItem) Collection(bills []models.Bill) []BillListItem {
 func (response *BillDetailResponse) Make(bill models.Bill) *BillDetailResponse {
 	items := make([]BillItemDetail, 0, len(bill.Items))
 	for _, item := range bill.Items {
-		productName := ""
+		productName, unit := "", ""
 		if item.Product != nil {
 			productName = item.Product.Name
+			unit = item.Product.Unit
 		}
 
 		items = append(items, BillItemDetail{
 			ID:          item.ID,
 			ProductID:   item.ProductID,
 			ProductName: productName,
-			Kilogram:    item.Kilogram,
+			Unit:        unit,
+			Quantity:    item.Quantity,
 			Price:       item.Price,
 			Subtotal:    item.Subtotal,
+			IsPromotion: item.PromotionID != nil,
+			PromotionID: item.PromotionID,
 		})
 	}
 
