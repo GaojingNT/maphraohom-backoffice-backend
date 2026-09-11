@@ -17,3 +17,14 @@ type CreatePromotionItem struct {
 	ProductID int     `json:"productId" validate:"required"`
 	Price     float64 `json:"price" validate:"required,gt=0"`
 }
+
+// UpdatePromotion replaces a promotion's editable fields and its full set of
+// per-product prices (existing prices are deleted and recreated, not
+// diffed) — same overlap rule as create, excluding the promotion itself.
+type UpdatePromotion struct {
+	Name     string                `json:"name" validate:"required"`
+	StoreID  int                   `json:"storeId" validate:"required"`
+	StartsAt time.Time             `json:"startsAt" validate:"required"`
+	EndsAt   time.Time             `json:"endsAt" validate:"required,gtfield=StartsAt"`
+	Items    []CreatePromotionItem `json:"items" validate:"required,min=1"`
+}

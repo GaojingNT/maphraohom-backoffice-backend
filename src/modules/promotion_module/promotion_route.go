@@ -11,5 +11,8 @@ func (m module) Routes(route fiber.Router, middleware *middlewares.Middleware) {
 	v1 := route.Group("v1")
 	promotion := v1.Group("promotions")
 	promotion.Get("", func(c *fiber.Ctx) error { return m.Controller().GetPromotions(c) })
+	promotion.Get(":id", func(c *fiber.Ctx) error { return m.Controller().GetPromotion(c) })
 	promotion.Post("", func(c *fiber.Ctx) error { return m.Controller().CreatePromotion(c) })
+	promotion.Put(":id", func(c *fiber.Ctx) error { return m.Controller().UpdatePromotion(c) })
+	promotion.Delete(":id", func(c *fiber.Ctx) error { return m.Controller().DeletePromotion(c) })
 }

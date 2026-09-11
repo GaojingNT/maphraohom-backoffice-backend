@@ -23,6 +23,20 @@ func (s Service) GetPromotions(ctx context.Context, storeID int) ([]responses.Pr
 	return responses.PromotionListItem{}.Collection(promotions), nil
 }
 
+func (s Service) GetPromotion(ctx context.Context, id int) (*responses.PromotionDetailResponse, error) {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "GetPromotionService", trace.WithAttributes(attribute.String("service", "GetPromotion")))
+
+	promotion, err := s.promotionRepository().GetPromotionByID(ctx, id)
+
+	s.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return new(responses.PromotionDetailResponse).Make(promotion), nil
+}
+
 func (s Service) CreatePromotion(ctx context.Context, dto *dtos.CreatePromotion) (*responses.PromotionDetailResponse, error) {
 	ctx, childSpan := s.tracer.TraceStart(ctx, "CreatePromotionService", trace.WithAttributes(attribute.String("service", "CreatePromotion")))
 
@@ -49,4 +63,42 @@ func (s Service) CreatePromotion(ctx context.Context, dto *dtos.CreatePromotion)
 	}
 
 	return new(responses.PromotionDetailResponse).Make(promotion), nil
+}
+
+func (s Service) UpdatePromotion(ctx context.Context, id int, dto *dtos.UpdatePromotion) (*responses.PromotionDetailResponse, error) {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "UpdatePromotionService", trace.WithAttributes(attribute.String("service", "UpdatePromotion")))
+
+	items := make([]CreatePromotionItemInput, 0, len(dto.Items))
+	for _, item := range dto.Items {
+		items = append(items, CreatePromotionItemInput{
+			ProductID: item.ProductID,
+			Price:     item.Price,
+		})
+	}
+
+	promotion, err := s.promotionRepository().UpdatePromotion(ctx, id, UpdatePromotionInput{
+		Name:     dto.Name,
+		StoreID:  dto.StoreID,
+		StartsAt: dto.StartsAt,
+		EndsAt:   dto.EndsAt,
+		Items:    items,
+	})
+
+	s.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return new(responses.PromotionDetailResponse).Make(promotion), nil
+}
+
+func (s Service) DeletePromotion(ctx context.Context, id int) error {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "DeletePromotionService", trace.WithAttributes(attribute.String("service", "DeletePromotion")))
+
+	err := s.promotionRepository().DeletePromotion(ctx, id)
+
+	s.tracer.TraceEnd(childSpan)
+
+	return err
 }

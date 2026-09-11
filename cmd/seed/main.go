@@ -18,6 +18,5 @@ func main() {
 	cleanAll(db)
 
 	productMap := seedProducts(db)
-	storeMap := seedStores(db, productMap)
-	seedPromotions(db, storeMap, productMap)
+	seedStores(db, productMap)
 }
