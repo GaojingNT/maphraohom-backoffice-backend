@@ -132,6 +132,59 @@ func (r Repository) GetStoreProducts(ctx context.Context, storeID int) ([]models
 	return prices, nil
 }
 
+// UpdateStoreProductPrice sets a store's base price for one product,
+// creating the (store, product) row if it doesn't exist yet (there is at
+// most one row per pair — no price history is kept).
+func (r Repository) UpdateStoreProductPrice(ctx context.Context, storeID int, productID int, price float64) (models.StoreProductPrice, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "UpdateStoreProductPriceRepository", trace.WithAttributes(attribute.String("repository", "UpdateStoreProductPrice"), attribute.Int("storeId", storeID), attribute.Int("productId", productID)))
+		record       models.StoreProductPrice
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			err = r.db.Where("store_id = ? AND product_id = ?", storeID, productID).First(&record).Error
+			if err != nil && err != gorm.ErrRecordNotFound {
+				utils.Throw(err)
+			}
+
+			if err == gorm.ErrRecordNotFound {
+				record = models.StoreProductPrice{StoreID: storeID, ProductID: productID, Price: price}
+				if err = r.db.Create(&record).Error; err != nil {
+					utils.Throw(err)
+				}
+				return
+			}
+
+			record.Price = price
+			if err = r.db.Save(&record).Error; err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			err = e.(error)
+			r.logger.Error(err.Error())
+			sentry.CaptureException(err)
+			exception.SqlErrorMessage = err.Error()
+			err = exception.ErrDbQueryStatement
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return record, err
+	}
+
+	if err = r.db.Preload("Product").First(&record, record.ID).Error; err != nil {
+		return record, err
+	}
+
+	return record, nil
+}
+
 // GetActivePromotion returns the store's currently active promotion, or nil
 // if none is active (not treated as an error).
 func (r Repository) GetActivePromotion(ctx context.Context, storeID int) (*models.Promotion, error) {

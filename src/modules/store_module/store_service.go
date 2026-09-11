@@ -58,6 +58,38 @@ func (s Service) GetStoreProducts(ctx context.Context, storeID int) ([]responses
 	return responses.StoreProductPriceItem{}.Collection(prices, promotion), nil
 }
 
+// GetStoreBasePrices lists a store's editable base prices (never resolved
+// against an active promotion) — used by the price-management admin screen.
+func (s Service) GetStoreBasePrices(ctx context.Context, storeID int) ([]responses.StoreProductBasePriceItem, error) {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "GetStoreBasePricesService", trace.WithAttributes(attribute.String("service", "GetStoreBasePrices")))
+
+	prices, err := s.storeRepository().GetStoreProducts(ctx, storeID)
+
+	s.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return responses.StoreProductBasePriceItem{}.Collection(prices), nil
+}
+
+// UpdateStoreProductPrice sets a store's base price for one product.
+func (s Service) UpdateStoreProductPrice(ctx context.Context, storeID int, productID int, price float64) (*responses.StoreProductBasePriceItem, error) {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "UpdateStoreProductPriceService", trace.WithAttributes(attribute.String("service", "UpdateStoreProductPrice")))
+
+	record, err := s.storeRepository().UpdateStoreProductPrice(ctx, storeID, productID, price)
+
+	s.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	item := responses.StoreProductBasePriceItem{}.Make(record)
+	return &item, nil
+}
+
 func (s Service) GetStoreProduct(ctx context.Context, storeID int, productID int) (*responses.StoreProductPriceItem, error) {
 	ctx, childSpan := s.tracer.TraceStart(ctx, "GetStoreProductService", trace.WithAttributes(attribute.String("service", "GetStoreProduct")))
 

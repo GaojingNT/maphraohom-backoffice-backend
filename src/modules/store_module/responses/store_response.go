@@ -30,6 +30,18 @@ type (
 		IsPromotion bool    `json:"isPromotion"`
 		PromotionID *int    `json:"promotionId,omitempty"`
 	}
+
+	// StoreProductBasePriceItem is one product's editable base price at a
+	// store — the raw store_product_prices row, never resolved against an
+	// active promotion. Used by the price-management admin screen, where
+	// showing/editing a promo-discounted number would be wrong.
+	StoreProductBasePriceItem struct {
+		ProductID   int     `json:"productId"`
+		ProductName string  `json:"productName"`
+		Unit        string  `json:"unit"`
+		Price       float64 `json:"price"`
+		UpdatedAt   string  `json:"updatedAt"`
+	}
 )
 
 func (StoreListItem) Collection(stores []models.Store) []StoreListItem {
@@ -90,6 +102,30 @@ func (item StoreProductPriceItem) Collection(prices []models.StoreProductPrice, 
 	items := make([]StoreProductPriceItem, 0, len(prices))
 	for _, price := range prices {
 		items = append(items, item.Make(price, promotion))
+	}
+	return items
+}
+
+func (StoreProductBasePriceItem) Make(price models.StoreProductPrice) StoreProductBasePriceItem {
+	productName, unit := "", ""
+	if price.Product != nil {
+		productName = price.Product.Name
+		unit = price.Product.Unit
+	}
+
+	return StoreProductBasePriceItem{
+		ProductID:   price.ProductID,
+		ProductName: productName,
+		Unit:        unit,
+		Price:       price.Price,
+		UpdatedAt:   price.UpdatedAt.Format("2006-01-02 15:04:05"),
+	}
+}
+
+func (item StoreProductBasePriceItem) Collection(prices []models.StoreProductPrice) []StoreProductBasePriceItem {
+	items := make([]StoreProductBasePriceItem, 0, len(prices))
+	for _, price := range prices {
+		items = append(items, item.Make(price))
 	}
 	return items
 }
