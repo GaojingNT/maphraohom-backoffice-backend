@@ -2003,6 +2003,9 @@
                 "slipUrl": {
                     "type": "string"
                 },
+                "storeAddress": {
+                    "type": "string"
+                },
                 "storeId": {
                     "type": "integer"
                 },
@@ -2010,6 +2013,12 @@
                     "type": "string"
                 },
                 "storeName": {
+                    "type": "string"
+                },
+                "storePhone": {
+                    "type": "string"
+                },
+                "storeSignature": {
                     "type": "string"
                 },
                 "total": {

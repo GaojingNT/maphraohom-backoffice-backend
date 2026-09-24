@@ -171,11 +171,17 @@ definitions:
         type: number
       slipUrl:
         type: string
+      storeAddress:
+        type: string
       storeId:
         type: integer
       storeLogo:
         type: string
       storeName:
+        type: string
+      storePhone:
+        type: string
+      storeSignature:
         type: string
       total:
         type: number
