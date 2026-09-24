@@ -189,16 +189,22 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- receipt: seed from the most recent bill issued this calendar year per
--- store (every pre-migration bill is type='receipt' by definition — the
--- type column above just defaulted them all). updated_at is backdated to
--- that bill's created_at (not "now") so a future year-rollover check compares
--- against the real last-issue date, not the migration's run date.
+-- receipt: seed from the most recent NON-DELETED bill issued this calendar
+-- year per store (every pre-migration bill is type='receipt' by definition —
+-- the type column above just defaulted them all). A soft-deleted bill must
+-- be skipped here exactly like the app's own numbering query always
+-- excluded it (GORM's default soft-delete scope on the old "last bill"
+-- lookup) — otherwise a deleted bill's number would be reused as the
+-- starting point instead of correctly starting that store fresh. updated_at
+-- is backdated to that bill's created_at (not "now") so a future
+-- year-rollover check compares against the real last-issue date, not the
+-- migration's run date.
 INSERT INTO tbl_bill_sequences (store_id, type, last_book_no, last_receipt_no, updated_at)
 SELECT DISTINCT ON (b.store_id)
 	b.store_id, 'receipt', b.book_no, b.receipt_no, b.created_at
 FROM tbl_bills b
 WHERE b.type = 'receipt'
+	AND b.deleted_at IS NULL
 	AND b.created_at >= date_trunc('year', now())
 ORDER BY b.store_id, b.id DESC
 ON CONFLICT (store_id, type) DO NOTHING;
@@ -217,10 +223,16 @@ ON CONFLICT (store_id, type) DO NOTHING;
 -- 7) bill numbering uniqueness + report index --------------------------------------------------
 -- No prior unique constraint existed on (store_id, book_no, receipt_no) —
 -- uniqueness was only guaranteed by application-level locking — so this is
--- a new addition, not a replacement.
-
+-- a new addition, not a replacement. Partial (WHERE deleted_at IS NULL):
+-- a deleted bill's number is retired, never reused for a new bill, but a
+-- deleted bill can legitimately share its old number with another deleted
+-- bill from before this table tracked types (e.g. two test bills soft-
+-- deleted the same day both ended up as book 1 / receipt 1 under the old
+-- numbering query, which always excluded deleted rows) — a plain (non-
+-- partial) unique index would reject the migration outright the moment any
+-- such historical duplicate exists among deleted rows.
 CREATE UNIQUE INDEX IF NOT EXISTS tbl_bills_store_type_no_uq
-	ON tbl_bills (store_id, type, book_no, receipt_no);
+	ON tbl_bills (store_id, type, book_no, receipt_no) WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS tbl_bills_store_type_created_idx
 	ON tbl_bills (store_id, type, created_at);
