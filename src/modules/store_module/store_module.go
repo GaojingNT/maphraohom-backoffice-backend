@@ -4,19 +4,23 @@ import (
 	"gorm.io/gorm"
 	"maphraohom.app/maphraohom-backoffice/pkg/database"
 	"maphraohom.app/maphraohom-backoffice/pkg/logger"
+	"maphraohom.app/maphraohom-backoffice/pkg/storage"
 	"maphraohom.app/maphraohom-backoffice/pkg/tracing"
 )
 
 type (
 	module struct {
-		db     *gorm.DB
-		tracer *tracing.MyTracer
+		db         *gorm.DB
+		tracer     *tracing.MyTracer
+		fileSystem *storage.FileSystem
 	}
 	Controller struct {
 		m *module
 	}
 	Service struct {
-		tracer *tracing.MyTracer
+		tracer     *tracing.MyTracer
+		fileSystem *storage.FileSystem
+		log        *logger.Logger
 	}
 	Repository struct {
 		db     *gorm.DB
@@ -27,8 +31,9 @@ type (
 
 func NewModule() module {
 	return module{
-		db:     database.CurrentDatabase(),
-		tracer: tracing.CurrentTracer(),
+		db:         database.CurrentDatabase(),
+		tracer:     tracing.CurrentTracer(),
+		fileSystem: storage.CurrentFileStorage(),
 	}
 }
 
@@ -40,7 +45,9 @@ func (m *module) Controller() Controller {
 
 func NewService() Service {
 	return Service{
-		tracer: tracing.CurrentTracer(),
+		tracer:     tracing.CurrentTracer(),
+		fileSystem: storage.CurrentFileStorage(),
+		log:        logger.CurrentLogger(),
 	}
 }
 

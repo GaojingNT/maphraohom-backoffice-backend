@@ -88,6 +88,15 @@ definitions:
       type:
         type: string
     type: object
+  dtos.UpdateStore:
+    properties:
+      address:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+    type: object
   exception.ErrorResponse:
     properties:
       code:
@@ -351,6 +360,8 @@ definitions:
     type: object
   responses.StoreDetailResponse:
     properties:
+      address:
+        type: string
       createdAt:
         type: string
       id:
@@ -358,6 +369,10 @@ definitions:
       logo:
         type: string
       name:
+        type: string
+      phone:
+        type: string
+      signature:
         type: string
       updatedAt:
         type: string
@@ -1151,6 +1166,181 @@ paths:
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
       summary: Get store
+      tags:
+      - Store Module (Version 1)
+    put:
+      consumes:
+      - application/json
+      description: Replace a store's name, address, and phone. Logo/signature are
+        uploaded through their own endpoints.
+      parameters:
+      - description: store id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: store
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.UpdateStore'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.StoreDetailResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Update store
+      tags:
+      - Store Module (Version 1)
+  /api/v1/stores/{id}/logo:
+    delete:
+      consumes:
+      - application/json
+      description: Clear a store's logo and remove the underlying file (best-effort)
+      parameters:
+      - description: store id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http_response.OkResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Delete a store's logo
+      tags:
+      - Store Module (Version 1)
+    put:
+      consumes:
+      - multipart/form-data
+      description: Upload a logo image (jpeg/png/webp, checked by magic bytes, ≤ 10MB)
+        for an existing store. Replaces any existing logo.
+      parameters:
+      - description: store id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: logo image
+        in: formData
+        name: logo
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              logo:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Upload a store's logo
+      tags:
+      - Store Module (Version 1)
+  /api/v1/stores/{id}/signature:
+    delete:
+      consumes:
+      - application/json
+      description: Clear a store's signature and remove the underlying file (best-effort)
+      parameters:
+      - description: store id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http_response.OkResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Delete a store's signature
+      tags:
+      - Store Module (Version 1)
+    put:
+      consumes:
+      - multipart/form-data
+      description: Upload a signature image (jpeg/png/webp, checked by magic bytes,
+        ≤ 10MB) for an existing store. Replaces any existing signature.
+      parameters:
+      - description: store id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: signature image
+        in: formData
+        name: signature
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              signature:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Upload a store's signature
       tags:
       - Store Module (Version 1)
   /api/v1/stores/{storeId}/last-prices:

@@ -118,7 +118,9 @@ func (response *BillDetailResponse) Make(bill models.Bill) *BillDetailResponse {
 	var storeName, storeLogo string
 	if bill.Store != nil {
 		storeName = bill.Store.Name
-		storeLogo = bill.Store.Logo
+		if bill.Store.Logo != "" {
+			storeLogo = SlipURLBuilder(bill.Store.Logo)
+		}
 	}
 
 	var slipURL *string

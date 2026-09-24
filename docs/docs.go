@@ -1146,6 +1146,265 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "put": {
+                "description": "Replace a store's name, address, and phone. Logo/signature are uploaded through their own endpoints.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store Module (Version 1)"
+                ],
+                "summary": "Update store",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "store id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "store",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtos.UpdateStore"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.StoreDetailResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/stores/{id}/logo": {
+            "put": {
+                "description": "Upload a logo image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing store. Replaces any existing logo.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store Module (Version 1)"
+                ],
+                "summary": "Upload a store's logo",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "store id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "logo image",
+                        "name": "logo",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "logo": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Clear a store's logo and remove the underlying file (best-effort)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store Module (Version 1)"
+                ],
+                "summary": "Delete a store's logo",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "store id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http_response.OkResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/stores/{id}/signature": {
+            "put": {
+                "description": "Upload a signature image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing store. Replaces any existing signature.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store Module (Version 1)"
+                ],
+                "summary": "Upload a store's signature",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "store id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "signature image",
+                        "name": "signature",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "signature": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Clear a store's signature and remove the underlying file (best-effort)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Store Module (Version 1)"
+                ],
+                "summary": "Delete a store's signature",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "store id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http_response.OkResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/api/v1/stores/{storeId}/last-prices": {
@@ -1629,6 +1888,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dtos.UpdateStore": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                }
+            }
+        },
         "exception.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -2034,6 +2307,9 @@ const docTemplate = `{
         "responses.StoreDetailResponse": {
             "type": "object",
             "properties": {
+                "address": {
+                    "type": "string"
+                },
                 "createdAt": {
                     "type": "string"
                 },
@@ -2044,6 +2320,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "signature": {
                     "type": "string"
                 },
                 "updatedAt": {

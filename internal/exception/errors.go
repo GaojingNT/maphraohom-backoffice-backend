@@ -24,6 +24,9 @@ var (
 	ErrBillFieldImmutable  = eris.New("storeId and type cannot be changed on an existing bill")
 	ErrUnsupportedSlipType = eris.New("slip file type not supported (jpeg, png, webp only)")
 	ErrSlipFileTooLarge    = eris.New("slip file exceeds the 10MB size limit")
+	// Store errors
+	ErrUnsupportedImageType = eris.New("image file type not supported (jpeg, png, webp only)")
+	ErrImageFileTooLarge    = eris.New("image file exceeds the 10MB size limit")
 	// Auth errors
 	ErrInvalidLoginCredential    = eris.New("invalid login credential")
 	ErrInvalidResetPasswordToken = eris.New("invalid reset password token")
@@ -49,6 +52,9 @@ var (
 	BillFieldImmutableResponseError  = &ErrorResponse{Code: "BILL-1002", Message: "storeId and type cannot be changed on an existing bill"}
 	UnsupportedSlipTypeResponseError = &ErrorResponse{Code: "BILL-1003", Message: "slip file type not supported (jpeg, png, webp only)"}
 	SlipFileTooLargeResponseError    = &ErrorResponse{Code: "BILL-1004", Message: "slip file exceeds the 10MB size limit"}
+	// Store error response messages
+	UnsupportedImageTypeResponseError = &ErrorResponse{Code: "STORE-1001", Message: "image file type not supported (jpeg, png, webp only)"}
+	ImageFileTooLargeResponseError    = &ErrorResponse{Code: "STORE-1002", Message: "image file exceeds the 10MB size limit"}
 	// Auth error response messages
 	InvalidLoginCredentialResponseError    = &ErrorResponse{Code: "A-3001", Message: "invalid login credential"}
 	InvalidResetPasswordTokenResponseError = &ErrorResponse{Code: "A-3002", Message: "invalid reset password token"}

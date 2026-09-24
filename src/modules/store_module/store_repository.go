@@ -92,6 +92,145 @@ func (r Repository) GetStoreByID(ctx context.Context, id int) (models.Store, err
 	return store, nil
 }
 
+// UpdateStoreInput is the editable, non-image subset of a store — name,
+// address, phone. Logo/Signature are only ever changed through their own
+// upload/delete methods below.
+type UpdateStoreInput struct {
+	Name    string
+	Address string
+	Phone   string
+}
+
+func (r Repository) UpdateStore(ctx context.Context, id int, input UpdateStoreInput) (models.Store, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "UpdateStoreRepository", trace.WithAttributes(attribute.String("repository", "UpdateStore"), attribute.Int64("id", int64(id))))
+		store        models.Store
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.First(&store, id).Error; err != nil {
+				utils.Throw(err)
+			}
+
+			store.Name = input.Name
+			store.Address = input.Address
+			store.Phone = input.Phone
+
+			if err = r.db.Save(&store).Error; err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			if err == gorm.ErrRecordNotFound {
+				err = exception.ErrRecordNotFound
+			} else {
+				err = e.(error)
+				r.logger.Error(err.Error())
+				sentry.CaptureException(err)
+				exception.SqlErrorMessage = err.Error()
+				err = exception.ErrDbQueryStatement
+			}
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return store, err
+	}
+
+	return store, nil
+}
+
+// getStoreImageKey and updateStoreImage back GetStoreLogoKey/UpdateStoreLogo
+// and GetStoreSignatureKey/UpdateStoreSignature below — logo and signature
+// are both plain object-key columns on tbl_stores, so the read/write logic
+// only differs by column name.
+func (r Repository) getStoreImageKey(ctx context.Context, id int, column string, spanName string) (string, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, spanName, trace.WithAttributes(attribute.String("repository", spanName), attribute.Int64("id", int64(id))))
+		store        models.Store
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Select("id", column).First(&store, id).Error; err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			if err == gorm.ErrRecordNotFound {
+				err = exception.ErrRecordNotFound
+			} else {
+				err = e.(error)
+				r.logger.Error(err.Error())
+				sentry.CaptureException(err)
+				exception.SqlErrorMessage = err.Error()
+				err = exception.ErrDbQueryStatement
+			}
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return "", err
+	}
+
+	if column == "signature" {
+		return store.Signature, nil
+	}
+	return store.Logo, nil
+}
+
+func (r Repository) updateStoreImage(ctx context.Context, id int, column string, key string, spanName string) error {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, spanName, trace.WithAttributes(attribute.String("repository", spanName), attribute.Int64("id", int64(id))))
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Model(&models.Store{}).Where("id = ?", id).Update(column, key).Error; err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			err = e.(error)
+			r.logger.Error(err.Error())
+			sentry.CaptureException(err)
+			exception.SqlErrorMessage = err.Error()
+			err = exception.ErrDbQueryStatement
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	return err
+}
+
+func (r Repository) GetStoreLogoKey(ctx context.Context, id int) (string, error) {
+	return r.getStoreImageKey(ctx, id, "logo", "GetStoreLogoKeyRepository")
+}
+
+func (r Repository) UpdateStoreLogo(ctx context.Context, id int, key string) error {
+	return r.updateStoreImage(ctx, id, "logo", key, "UpdateStoreLogoRepository")
+}
+
+func (r Repository) GetStoreSignatureKey(ctx context.Context, id int) (string, error) {
+	return r.getStoreImageKey(ctx, id, "signature", "GetStoreSignatureKeyRepository")
+}
+
+func (r Repository) UpdateStoreSignature(ctx context.Context, id int, key string) error {
+	return r.updateStoreImage(ctx, id, "signature", key, "UpdateStoreSignatureRepository")
+}
+
 // lastPriceRow is the scan target for GetLastPrices' DISTINCT ON query.
 type lastPriceRow struct {
 	ProductID int
