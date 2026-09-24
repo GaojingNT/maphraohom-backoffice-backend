@@ -1,4 +1,84 @@
 definitions:
+  dtos.CreateBill:
+    properties:
+      customerAddress:
+        type: string
+      customerId:
+        type: integer
+      customerName:
+        type: string
+      customerPhone:
+        type: string
+      discount:
+        type: number
+      items:
+        items:
+          $ref: '#/definitions/dtos.CreateBillItem'
+        type: array
+      shippingFee:
+        type: number
+      storeId:
+        type: integer
+      type:
+        type: string
+    type: object
+  dtos.CreateBillItem:
+    properties:
+      price:
+        type: number
+      productId:
+        type: integer
+      quantity:
+        type: number
+    type: object
+  dtos.CreateCustomer:
+    properties:
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  dtos.CreateCustomerAddress:
+    properties:
+      address:
+        type: string
+      isDefault:
+        type: boolean
+    required:
+    - address
+    type: object
+  dtos.CreateCustomerPhone:
+    properties:
+      isDefault:
+        type: boolean
+      phone:
+        type: string
+    required:
+    - phone
+    type: object
+  dtos.UpdateBill:
+    properties:
+      customerAddress:
+        type: string
+      customerId:
+        type: integer
+      customerName:
+        type: string
+      customerPhone:
+        type: string
+      discount:
+        type: number
+      items:
+        items:
+          $ref: '#/definitions/dtos.CreateBillItem'
+        type: array
+      shippingFee:
+        type: number
+      storeId:
+        type: integer
+      type:
+        type: string
+    type: object
   exception.ErrorResponse:
     properties:
       code:
@@ -57,6 +137,8 @@ definitions:
         type: integer
       customerName:
         type: string
+      customerPhone:
+        type: string
       discount:
         type: number
       id:
@@ -69,7 +151,7 @@ definitions:
         type: integer
       shippingFee:
         type: number
-      slip:
+      slipUrl:
         type: string
       storeId:
         type: integer
@@ -79,6 +161,8 @@ definitions:
         type: string
       total:
         type: number
+      type:
+        type: string
       updatedAt:
         type: string
     type: object
@@ -86,16 +170,18 @@ definitions:
     properties:
       id:
         type: integer
-      kilogram:
-        type: number
       price:
         type: number
       productId:
         type: integer
       productName:
         type: string
+      quantity:
+        type: number
       subtotal:
         type: number
+      unit:
+        type: string
     type: object
   responses.CustomerAddressItem:
     properties:
@@ -107,8 +193,6 @@ definitions:
         type: integer
       isDefault:
         type: boolean
-      label:
-        type: string
       updatedAt:
         type: string
     type: object
@@ -120,6 +204,19 @@ definitions:
         type: integer
       name:
         type: string
+      phone:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  responses.CustomerPhoneItem:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: integer
+      isDefault:
+        type: boolean
       phone:
         type: string
       updatedAt:
@@ -227,6 +324,22 @@ definitions:
       user:
         $ref: '#/definitions/responses.UserResponse'
     type: object
+  responses.LastPriceItem:
+    properties:
+      price:
+        type: number
+      productId:
+        type: integer
+    type: object
+  responses.ProductListItem:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      unit:
+        type: string
+    type: object
   responses.StoreDetailResponse:
     properties:
       createdAt:
@@ -238,17 +351,6 @@ definitions:
       name:
         type: string
       updatedAt:
-        type: string
-    type: object
-  responses.StoreProductPriceItem:
-    properties:
-      effectiveFrom:
-        type: string
-      price:
-        type: number
-      productId:
-        type: integer
-      productName:
         type: string
     type: object
   responses.UserResponse:
@@ -454,8 +556,8 @@ paths:
       consumes:
       - application/json
       description: |-
-        Get bills (paginated) — id, storeId, storeName, receiptNo,
-        customerName, customerAddress, total, totalKilogram, itemCount, createdAt
+        Get bills (paginated) — id, type, storeId, storeName, bookNo,
+        receiptNo, customerName, customerAddress, total, itemCount, hasSlip, createdAt
       parameters:
       - description: page number
         in: query
@@ -469,13 +571,21 @@ paths:
         in: query
         name: search
         type: string
-      - description: 'filter by created_at: day, week, month, or year'
+      - description: 'filter by bill type: receipt or payment'
         in: query
-        name: period
+        name: type
         type: string
-      - description: 'reference date for period, YYYY-MM-DD (default: today)'
+      - description: filter by store id
         in: query
-        name: date
+        name: storeId
+        type: integer
+      - description: filter created_at >= this date, YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: filter created_at <= this date, YYYY-MM-DD
+        in: query
+        name: to
         type: string
       produces:
       - application/json
@@ -484,6 +594,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/paginator.Pagination'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -493,51 +607,24 @@ paths:
       - Bill Module (Version 1)
     post:
       consumes:
-      - multipart/form-data
+      - application/json
       description: |-
-        Create a bill with one or more line items. Book/receipt
-        numbers and each item's price are computed server-side (price
-        looked up from the store's current product price); the receipt
-        number resets every 50 receipts (new book) and every calendar
-        year (back to book 1 / receipt 1).
+        Create a bill (JSON) with one or more line items, priced by the
+        caller (no price list). Book/receipt numbers are computed
+        server-side, scoped per (store, type); unit/subtotal/total and
+        anything else derivable are ignored if the client sends them.
       parameters:
-      - description: store id
-        in: formData
-        name: storeId
+      - description: bill
+        in: body
+        name: body
         required: true
-        type: integer
-      - description: customer name
-        in: formData
-        name: customerName
-        required: true
-        type: string
-      - description: customer address
-        in: formData
-        name: customerAddress
-        required: true
-        type: string
-      - description: JSON array, e.g. [{\
-        in: formData
-        name: items
-        required: true
-        type: string
-      - description: discount
-        in: formData
-        name: discount
-        type: number
-      - description: shipping fee
-        in: formData
-        name: shippingFee
-        type: number
-      - description: slip image
-        in: formData
-        name: slip
-        type: file
+        schema:
+          $ref: '#/definitions/dtos.CreateBill'
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
             $ref: '#/definitions/responses.BillDetailResponse'
         "400":
@@ -555,7 +642,8 @@ paths:
     delete:
       consumes:
       - application/json
-      description: Delete bill by id
+      description: Delete bill by id — soft delete only, slip and book/receipt number
+        are kept as-is (never reused)
       parameters:
       - description: bill id
         in: path
@@ -583,7 +671,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get bill by id — every bills column except deleted_at
+      description: Get bill by id — every bills column except deleted_at, plus a ready-to-use
+        slipUrl
       parameters:
       - description: bill id
         in: path
@@ -610,54 +699,24 @@ paths:
       - Bill Module (Version 1)
     put:
       consumes:
-      - multipart/form-data
+      - application/json
       description: |-
-        Replace a bill's store, customer, items, discount, shipping
-        fee, and (optionally) slip. Book/receipt numbers are kept as-is;
-        each item's price is re-looked-up from the store's current
-        product price, same as create.
+        Replace a bill's customer, items, discount, and shipping fee
+        (JSON, same shape as create). storeId and type must match the
+        existing bill — sending different values is rejected with 400.
+        Book/receipt numbers and the slip are never touched here.
       parameters:
       - description: bill id
         in: path
         name: id
         required: true
         type: integer
-      - description: store id
-        in: formData
-        name: storeId
+      - description: bill
+        in: body
+        name: body
         required: true
-        type: integer
-      - description: customer name
-        in: formData
-        name: customerName
-        required: true
-        type: string
-      - description: customer address
-        in: formData
-        name: customerAddress
-        required: true
-        type: string
-      - description: JSON array, e.g. [{\
-        in: formData
-        name: items
-        required: true
-        type: string
-      - description: discount
-        in: formData
-        name: discount
-        type: number
-      - description: shipping fee
-        in: formData
-        name: shippingFee
-        type: number
-      - description: new slip image (replaces the existing one)
-        in: formData
-        name: slip
-        type: file
-      - description: clear the existing slip (ignored if a new slip is uploaded)
-        in: formData
-        name: removeSlip
-        type: boolean
+        schema:
+          $ref: '#/definitions/dtos.UpdateBill'
       produces:
       - application/json
       responses:
@@ -678,6 +737,76 @@ paths:
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
       summary: Update bill
+      tags:
+      - Bill Module (Version 1)
+  /api/v1/bills/{id}/slip:
+    delete:
+      consumes:
+      - application/json
+      description: Clear a bill's slip and remove the underlying file (best-effort)
+      parameters:
+      - description: bill id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http_response.OkResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Delete a bill's slip
+      tags:
+      - Bill Module (Version 1)
+    put:
+      consumes:
+      - multipart/form-data
+      description: Upload a slip image (jpeg/png/webp, checked by magic bytes, ≤ 10MB)
+        for an existing, non-deleted bill. Replaces any existing slip.
+      parameters:
+      - description: bill id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: slip image
+        in: formData
+        name: slip
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              slipUrl:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Upload a bill's slip
       tags:
       - Bill Module (Version 1)
   /api/v1/customers:
@@ -710,6 +839,35 @@ paths:
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
       summary: List customers
+      tags:
+      - Customer Module (Version 1)
+    post:
+      consumes:
+      - application/json
+      description: Create a new customer by name
+      parameters:
+      - description: customer
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.CreateCustomer'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.CustomerDetailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Create customer
       tags:
       - Customer Module (Version 1)
   /api/v1/customers/{id}:
@@ -768,6 +926,109 @@ paths:
       summary: List a customer's addresses
       tags:
       - Customer Module (Version 1)
+    post:
+      consumes:
+      - application/json
+      description: Add a new address for a customer, optionally marking it default
+      parameters:
+      - description: customer id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: address
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.CreateCustomerAddress'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.CustomerAddressItem'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Add a customer address
+      tags:
+      - Customer Module (Version 1)
+  /api/v1/customers/{id}/phones:
+    get:
+      consumes:
+      - application/json
+      description: Get every phone number on file for this customer (default-first)
+      parameters:
+      - description: customer id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/responses.CustomerPhoneItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: List a customer's phone numbers
+      tags:
+      - Customer Module (Version 1)
+    post:
+      consumes:
+      - application/json
+      description: Add a new phone number for a customer, optionally marking it default
+      parameters:
+      - description: customer id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: phone
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.CreateCustomerPhone'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.CustomerPhoneItem'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Add a customer phone number
+      tags:
+      - Customer Module (Version 1)
   /api/v1/files/{path}:
     get:
       description: |-
@@ -799,6 +1060,27 @@ paths:
       summary: Get an uploaded file
       tags:
       - File Module (Version 1)
+  /api/v1/products:
+    get:
+      consumes:
+      - application/json
+      description: Get every product (id, name, unit)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/responses.ProductListItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: List products
+      tags:
+      - Product Module (Version 1)
   /api/v1/stores:
     get:
       consumes:
@@ -860,17 +1142,23 @@ paths:
       summary: Get store
       tags:
       - Store Module (Version 1)
-  /api/v1/stores/{id}/products:
+  /api/v1/stores/{storeId}/last-prices:
     get:
       consumes:
       - application/json
-      description: Get every product's currently effective price at this store
+      description: Get, for every product, the price used in this store's most recent
+        bill of the given type — used to prefill the create-bill form (optional).
       parameters:
       - description: store id
         in: path
-        name: id
+        name: storeId
         required: true
         type: integer
+      - description: 'bill type: receipt or payment'
+        in: query
+        name: type
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -878,47 +1166,17 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/responses.StoreProductPriceItem'
+              $ref: '#/definitions/responses.LastPriceItem'
             type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/exception.ErrorResponse'
-      summary: List a store's product prices
-      tags:
-      - Store Module (Version 1)
-  /api/v1/stores/{id}/products/{productId}:
-    get:
-      consumes:
-      - application/json
-      description: Get a single product's currently effective price at this store
-      parameters:
-      - description: store id
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: product id
-        in: path
-        name: productId
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/responses.StoreProductPriceItem'
-        "404":
-          description: Not Found
+        "400":
+          description: Bad Request
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
-      summary: Get a store's price for one product
+      summary: List a store's last-used prices
       tags:
       - Store Module (Version 1)
   /api/v1/users:
