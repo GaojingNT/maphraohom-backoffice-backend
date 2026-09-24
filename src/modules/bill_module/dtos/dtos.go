@@ -1,6 +1,10 @@
 package dtos
 
-import "github.com/shopspring/decimal"
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
 
 // CreateBillItem is one line item of a create/update-bill request. Price is
 // entered by the user — there is no price list to look up. Server computes
@@ -26,6 +30,13 @@ type CreateBill struct {
 	Discount        decimal.Decimal  `json:"discount"`
 	ShippingFee     decimal.Decimal  `json:"shippingFee"`
 	Items           []CreateBillItem `json:"items"`
+	// CreatedAt lets the client back- or post-date a bill (e.g. entering one
+	// for a sale that actually happened earlier) — RFC3339, e.g.
+	// "2026-09-20T14:30:00+07:00". Optional; defaults to the time the
+	// request is processed when omitted. Only book/receipt numbering's
+	// calendar-year rollover uses the real server clock — this field never
+	// affects that.
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
 }
 
 // UpdateBill is the JSON body of PUT /api/v1/bills/:id — same shape as

@@ -1,6 +1,15 @@
 definitions:
   dtos.CreateBill:
     properties:
+      createdAt:
+        description: |-
+          CreatedAt lets the client back- or post-date a bill (e.g. entering one
+          for a sale that actually happened earlier) — RFC3339, e.g.
+          "2026-09-20T14:30:00+07:00". Optional; defaults to the time the
+          request is processed when omitted. Only book/receipt numbering's
+          calendar-year rollover uses the real server clock — this field never
+          affects that.
+        type: string
       customerAddress:
         type: string
       customerId:
@@ -613,6 +622,8 @@ paths:
         caller (no price list). Book/receipt numbers are computed
         server-side, scoped per (store, type); unit/subtotal/total and
         anything else derivable are ignored if the client sends them.
+        createdAt is optional (RFC3339) to back-/post-date the bill —
+        defaults to now when omitted; never affects book/receipt numbering.
       parameters:
       - description: bill
         in: body

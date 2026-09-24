@@ -117,6 +117,8 @@ func (c Controller) GetBill(f *fiber.Ctx) error {
 //	@Description	caller (no price list). Book/receipt numbers are computed
 //	@Description	server-side, scoped per (store, type); unit/subtotal/total and
 //	@Description	anything else derivable are ignored if the client sends them.
+//	@Description	createdAt is optional (RFC3339) to back-/post-date the bill —
+//	@Description	defaults to now when omitted; never affects book/receipt numbering.
 //	@Tags			Bill Module (Version 1)
 //	@Accept			json
 //	@Produce		json

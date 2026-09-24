@@ -355,7 +355,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Create a bill (JSON) with one or more line items, priced by the\ncaller (no price list). Book/receipt numbers are computed\nserver-side, scoped per (store, type); unit/subtotal/total and\nanything else derivable are ignored if the client sends them.",
+                "description": "Create a bill (JSON) with one or more line items, priced by the\ncaller (no price list). Book/receipt numbers are computed\nserver-side, scoped per (store, type); unit/subtotal/total and\nanything else derivable are ignored if the client sends them.\ncreatedAt is optional (RFC3339) to back-/post-date the bill —\ndefaults to now when omitted; never affects book/receipt numbering.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1505,6 +1505,10 @@ const docTemplate = `{
         "dtos.CreateBill": {
             "type": "object",
             "properties": {
+                "createdAt": {
+                    "description": "CreatedAt lets the client back- or post-date a bill (e.g. entering one\nfor a sale that actually happened earlier) — RFC3339, e.g.\n\"2026-09-20T14:30:00+07:00\". Optional; defaults to the time the\nrequest is processed when omitted. Only book/receipt numbering's\ncalendar-year rollover uses the real server clock — this field never\naffects that.",
+                    "type": "string"
+                },
                 "customerAddress": {
                     "type": "string"
                 },

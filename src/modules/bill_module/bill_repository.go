@@ -43,6 +43,10 @@ type CreateBillInput struct {
 	ShippingFee     decimal.Decimal
 	Total           decimal.Decimal
 	Items           []CreateBillItemInput
+	// CreatedAt back-/post-dates the bill when set — nil means "now" (the
+	// database column's own default). Never affects book/receipt numbering,
+	// which is scoped by the real server clock's calendar year regardless.
+	CreatedAt *time.Time
 }
 
 // UpdateBillInput carries the already-validated fields for replacing a
@@ -340,6 +344,13 @@ func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (mode
 					ShippingFee:     input.ShippingFee,
 					Total:           input.Total,
 					Slip:            nil,
+				}
+				// A caller-supplied CreatedAt back-/post-dates the bill —
+				// GORM only auto-fills CreatedAt when it's still the zero
+				// value, so setting it here before Create is enough to
+				// override the column's CURRENT_TIMESTAMP default.
+				if input.CreatedAt != nil {
+					bill.CreatedAt = *input.CreatedAt
 				}
 
 				if txErr := tx.Create(&bill).Error; txErr != nil {
