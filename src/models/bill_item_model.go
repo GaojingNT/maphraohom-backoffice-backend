@@ -1,5 +1,7 @@
 package models
 
+import "github.com/shopspring/decimal"
+
 type BillItem struct {
 	BaseModel
 
@@ -9,19 +11,18 @@ type BillItem struct {
 	ProductID int      `json:"productId" gorm:"column:product_id;not null;"`
 	Product   *Product `json:"product,omitempty" gorm:"foreignKey:ProductID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 
-	// PromotionID is set when this item's price came from an active
-	// promotion instead of the store's base price — nil otherwise.
-	PromotionID *int       `json:"promotionId,omitempty" gorm:"column:promotion_id;null;"`
-	Promotion   *Promotion `json:"promotion,omitempty" gorm:"foreignKey:PromotionID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	// Quantity is in Unit — kilograms ("กก.") for most products, or bottles
+	// ("ขวด") for coconut water. Must be a whole number when Unit is "ขวด".
+	Quantity decimal.Decimal `json:"quantity" gorm:"column:quantity;type:numeric(10,3);not null;"`
 
-	// Quantity is in the product's unit — kilograms for most products, or
-	// bottles ("ขวด") for coconut water.
-	Quantity float64 `json:"quantity" gorm:"column:quantity;not null;"`
+	// Unit is a snapshot of products.unit taken at issue time.
+	Unit string `json:"unit" gorm:"column:unit;size:20;not null;"`
 
-	// Price snapshot resolved (promotion-first, else store base price) at
-	// issue time.
-	Price float64 `json:"price" gorm:"column:price;not null;"`
+	// Price is the per-unit price the user typed in when the bill was
+	// created — there is no price list, so this is never resolved from
+	// anywhere else.
+	Price decimal.Decimal `json:"price" gorm:"column:price;type:numeric(10,2);not null;"`
 
-	// Subtotal = quantity * price
-	Subtotal float64 `json:"subtotal" gorm:"column:subtotal;not null;"`
+	// Subtotal = round(quantity * price, 2), computed server-side.
+	Subtotal decimal.Decimal `json:"subtotal" gorm:"column:subtotal;type:numeric(12,2);not null;"`
 }

@@ -6,8 +6,6 @@ import "github.com/rotisserie/eris"
 var (
 	// Sql error message
 	SqlErrorMessage string
-	// Promotion overlap detail message (names the conflicting promotion)
-	PromotionOverlapMessage string
 	// Server errors
 	ErrInternalServerError            = eris.New("internal server error")
 	ErrUnauthorized                   = eris.New("unauthorized")
@@ -19,10 +17,13 @@ var (
 	ErrFileSizeLimitExceeded          = eris.New("file size limit exceeded")
 	ErrRequestContentTypeNotSupported = eris.New("request content type not supported")
 	// Database errors
-	ErrDbQueryStatement   = eris.New("database query statement error")
-	ErrRecordNotFound     = eris.New("record not found")
-	ErrPriceNotConfigured = eris.New("price not configured for this store and product")
-	ErrPromotionOverlap   = eris.New("promotion overlaps with an existing active promotion for this store")
+	ErrDbQueryStatement = eris.New("database query statement error")
+	ErrRecordNotFound   = eris.New("record not found")
+	// Bill errors
+	ErrBillSequenceMissing = eris.New("bill sequence not seeded for this store and type")
+	ErrBillFieldImmutable  = eris.New("storeId and type cannot be changed on an existing bill")
+	ErrUnsupportedSlipType = eris.New("slip file type not supported (jpeg, png, webp only)")
+	ErrSlipFileTooLarge    = eris.New("slip file exceeds the 10MB size limit")
 	// Auth errors
 	ErrInvalidLoginCredential    = eris.New("invalid login credential")
 	ErrInvalidResetPasswordToken = eris.New("invalid reset password token")
@@ -41,10 +42,13 @@ var (
 	NotFoundResponseError            = &ErrorResponse{Code: "S-404", Message: "not found"}
 	ErrorResponseInternalServerError = &ErrorResponse{Code: "S-500", Message: "internal server error"}
 	// Database error response messages
-	DbQueryStatementResponseError   = &ErrorResponse{Code: "DB-1001", Message: "database query statement error"}
-	RecordNotFoundResponseError     = &ErrorResponse{Code: "DB-1002", Message: "record not found"}
-	PriceNotConfiguredResponseError = &ErrorResponse{Code: "DB-1003", Message: "price not configured for this store and product"}
-	PromotionOverlapResponseError   = &ErrorResponse{Code: "DB-1004", Message: "promotion overlaps with an existing active promotion for this store"}
+	DbQueryStatementResponseError = &ErrorResponse{Code: "DB-1001", Message: "database query statement error"}
+	RecordNotFoundResponseError   = &ErrorResponse{Code: "DB-1002", Message: "record not found"}
+	// Bill error response messages
+	BillSequenceMissingResponseError = &ErrorResponse{Code: "BILL-1001", Message: "bill sequence not seeded for this store and type"}
+	BillFieldImmutableResponseError  = &ErrorResponse{Code: "BILL-1002", Message: "storeId and type cannot be changed on an existing bill"}
+	UnsupportedSlipTypeResponseError = &ErrorResponse{Code: "BILL-1003", Message: "slip file type not supported (jpeg, png, webp only)"}
+	SlipFileTooLargeResponseError    = &ErrorResponse{Code: "BILL-1004", Message: "slip file exceeds the 10MB size limit"}
 	// Auth error response messages
 	InvalidLoginCredentialResponseError    = &ErrorResponse{Code: "A-3001", Message: "invalid login credential"}
 	InvalidResetPasswordTokenResponseError = &ErrorResponse{Code: "A-3002", Message: "invalid reset password token"}

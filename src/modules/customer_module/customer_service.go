@@ -84,7 +84,7 @@ func (s Service) CreateCustomer(ctx context.Context, dto *dtos.CreateCustomer) (
 func (s Service) CreateCustomerAddress(ctx context.Context, customerID int, dto *dtos.CreateCustomerAddress) (*responses.CustomerAddressItem, error) {
 	ctx, childSpan := s.tracer.TraceStart(ctx, "CreateCustomerAddressService", trace.WithAttributes(attribute.String("service", "CreateCustomerAddress")))
 
-	address, err := s.customerRepository().CreateCustomerAddress(ctx, customerID, dto.Address, dto.Label, dto.IsDefault)
+	address, err := s.customerRepository().CreateCustomerAddress(ctx, customerID, dto.Address, dto.IsDefault)
 
 	s.tracer.TraceEnd(childSpan)
 
@@ -99,7 +99,7 @@ func (s Service) CreateCustomerAddress(ctx context.Context, customerID int, dto 
 func (s Service) CreateCustomerPhone(ctx context.Context, customerID int, dto *dtos.CreateCustomerPhone) (*responses.CustomerPhoneItem, error) {
 	ctx, childSpan := s.tracer.TraceStart(ctx, "CreateCustomerPhoneService", trace.WithAttributes(attribute.String("service", "CreateCustomerPhone")))
 
-	phone, err := s.customerRepository().CreateCustomerPhone(ctx, customerID, dto.Phone, dto.Label, dto.IsDefault)
+	phone, err := s.customerRepository().CreateCustomerPhone(ctx, customerID, dto.Phone, dto.IsDefault)
 
 	s.tracer.TraceEnd(childSpan)
 

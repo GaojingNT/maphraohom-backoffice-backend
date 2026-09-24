@@ -2,14 +2,13 @@ package store_module
 
 import (
 	"context"
-	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/shopspring/decimal"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
-	"maphraohom.app/maphraohom-backoffice/internal/pricing"
 	"maphraohom.app/maphraohom-backoffice/internal/utils"
 	"maphraohom.app/maphraohom-backoffice/pkg/database/paginator"
 	"maphraohom.app/maphraohom-backoffice/src/models"
@@ -93,23 +92,32 @@ func (r Repository) GetStoreByID(ctx context.Context, id int) (models.Store, err
 	return store, nil
 }
 
-// GetStoreProducts returns the store's base price for every product that
-// has one configured (one row per product — store_product_prices has a
-// unique (store_id, product_id) row, no history).
-func (r Repository) GetStoreProducts(ctx context.Context, storeID int) ([]models.StoreProductPrice, error) {
+// lastPriceRow is the scan target for GetLastPrices' DISTINCT ON query.
+type lastPriceRow struct {
+	ProductID int
+	Price     decimal.Decimal
+}
+
+// GetLastPrices returns, for every product, the price used in this store's
+// most recent bill of the given type (bill_items.price snapshot) — used to
+// prefill the create-bill form. Buy and sell prices never mix because the
+// query is scoped by type. Soft-deleted bills are excluded.
+func (r Repository) GetLastPrices(ctx context.Context, storeID int, billType string) ([]lastPriceRow, error) {
 	var (
-		_, childSpan = r.tracer.TraceStart(ctx, "GetStoreProductsRepository", trace.WithAttributes(attribute.String("repository", "GetStoreProducts"), attribute.Int("storeId", storeID)))
-		prices       = make([]models.StoreProductPrice, 0)
+		_, childSpan = r.tracer.TraceStart(ctx, "GetLastPricesRepository", trace.WithAttributes(attribute.String("repository", "GetLastPrices"), attribute.Int("storeId", storeID), attribute.String("type", billType)))
+		rows         = make([]lastPriceRow, 0)
 		err          error
 	)
 
 	utils.Block{
 		Try: func() {
 			if err = r.db.
-				Preload("Product").
-				Where("store_id = ?", storeID).
-				Order("product_id ASC").
-				Find(&prices).Error; err != nil {
+				Table("tbl_bill_items AS bi").
+				Select("DISTINCT ON (bi.product_id) bi.product_id AS product_id, bi.price AS price").
+				Joins("JOIN tbl_bills b ON b.id = bi.bill_id").
+				Where("b.store_id = ? AND b.type = ? AND b.deleted_at IS NULL", storeID, billType).
+				Order("bi.product_id, b.created_at DESC").
+				Scan(&rows).Error; err != nil {
 				utils.Throw(err)
 			}
 		},
@@ -129,145 +137,5 @@ func (r Repository) GetStoreProducts(ctx context.Context, storeID int) ([]models
 		return nil, err
 	}
 
-	return prices, nil
-}
-
-// UpdateStoreProductPrice sets a store's base price for one product,
-// creating the (store, product) row if it doesn't exist yet (there is at
-// most one row per pair — no price history is kept).
-func (r Repository) UpdateStoreProductPrice(ctx context.Context, storeID int, productID int, price float64) (models.StoreProductPrice, error) {
-	var (
-		_, childSpan = r.tracer.TraceStart(ctx, "UpdateStoreProductPriceRepository", trace.WithAttributes(attribute.String("repository", "UpdateStoreProductPrice"), attribute.Int("storeId", storeID), attribute.Int("productId", productID)))
-		record       models.StoreProductPrice
-		err          error
-	)
-
-	utils.Block{
-		Try: func() {
-			err = r.db.Where("store_id = ? AND product_id = ?", storeID, productID).First(&record).Error
-			if err != nil && err != gorm.ErrRecordNotFound {
-				utils.Throw(err)
-			}
-
-			if err == gorm.ErrRecordNotFound {
-				record = models.StoreProductPrice{StoreID: storeID, ProductID: productID, Price: price}
-				if err = r.db.Create(&record).Error; err != nil {
-					utils.Throw(err)
-				}
-				return
-			}
-
-			record.Price = price
-			if err = r.db.Save(&record).Error; err != nil {
-				utils.Throw(err)
-			}
-		},
-		Catch: func(e utils.Exception) {
-			err = e.(error)
-			r.logger.Error(err.Error())
-			sentry.CaptureException(err)
-			exception.SqlErrorMessage = err.Error()
-			err = exception.ErrDbQueryStatement
-		},
-		Finally: nil,
-	}.Do()
-
-	r.tracer.TraceEnd(childSpan)
-
-	if err != nil {
-		return record, err
-	}
-
-	if err = r.db.Preload("Product").First(&record, record.ID).Error; err != nil {
-		return record, err
-	}
-
-	return record, nil
-}
-
-// GetActivePromotion returns the store's currently active promotion, or nil
-// if none is active (not treated as an error).
-func (r Repository) GetActivePromotion(ctx context.Context, storeID int) (*models.Promotion, error) {
-	var (
-		_, childSpan = r.tracer.TraceStart(ctx, "GetActivePromotionRepository", trace.WithAttributes(attribute.String("repository", "GetActivePromotion"), attribute.Int("storeId", storeID)))
-		promotion    models.Promotion
-		notFound     bool
-		err          error
-	)
-
-	utils.Block{
-		Try: func() {
-			if promotion, err = pricing.ActivePromotion(r.db, storeID, time.Now()); err != nil {
-				utils.Throw(err)
-			}
-		},
-		Catch: func(e utils.Exception) {
-			if err == gorm.ErrRecordNotFound {
-				notFound = true
-				err = nil
-			} else {
-				err = e.(error)
-				r.logger.Error(err.Error())
-				sentry.CaptureException(err)
-				exception.SqlErrorMessage = err.Error()
-				err = exception.ErrDbQueryStatement
-			}
-		},
-		Finally: nil,
-	}.Do()
-
-	r.tracer.TraceEnd(childSpan)
-
-	if err != nil {
-		return nil, err
-	}
-	if notFound {
-		return nil, nil
-	}
-
-	return &promotion, nil
-}
-
-// GetStoreProduct returns one product's resolved price (promotion-first)
-// at this store, along with the product itself.
-func (r Repository) GetStoreProduct(ctx context.Context, storeID int, productID int) (models.Product, pricing.Resolved, error) {
-	var (
-		_, childSpan = r.tracer.TraceStart(ctx, "GetStoreProductRepository", trace.WithAttributes(attribute.String("repository", "GetStoreProduct"), attribute.Int("storeId", storeID), attribute.Int("productId", productID)))
-		product      models.Product
-		resolved     pricing.Resolved
-		err          error
-	)
-
-	utils.Block{
-		Try: func() {
-			if err = r.db.First(&product, productID).Error; err != nil {
-				utils.Throw(err)
-			}
-
-			resolved, err = pricing.ResolveOne(r.db, storeID, productID, time.Now())
-			if err != nil {
-				utils.Throw(err)
-			}
-		},
-		Catch: func(e utils.Exception) {
-			if err == gorm.ErrRecordNotFound {
-				err = exception.ErrRecordNotFound
-			} else {
-				err = e.(error)
-				r.logger.Error(err.Error())
-				sentry.CaptureException(err)
-				exception.SqlErrorMessage = err.Error()
-				err = exception.ErrDbQueryStatement
-			}
-		},
-		Finally: nil,
-	}.Do()
-
-	r.tracer.TraceEnd(childSpan)
-
-	if err != nil {
-		return product, resolved, err
-	}
-
-	return product, resolved, nil
+	return rows, nil
 }

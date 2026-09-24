@@ -12,8 +12,5 @@ func (m module) Routes(route fiber.Router, middleware *middlewares.Middleware) {
 	store := v1.Group("stores")
 	store.Get("", func(c *fiber.Ctx) error { return m.Controller().GetStores(c) })
 	store.Get(":id", func(c *fiber.Ctx) error { return m.Controller().GetStore(c) })
-	store.Get(":id/products", func(c *fiber.Ctx) error { return m.Controller().GetStoreProducts(c) })
-	store.Get(":id/products/:productId", func(c *fiber.Ctx) error { return m.Controller().GetStoreProduct(c) })
-	store.Put(":id/products/:productId", func(c *fiber.Ctx) error { return m.Controller().UpdateStoreProductPrice(c) })
-	store.Get(":id/base-prices", func(c *fiber.Ctx) error { return m.Controller().GetStoreBasePrices(c) })
+	store.Get(":storeId/last-prices", func(c *fiber.Ctx) error { return m.Controller().GetLastPrices(c) })
 }

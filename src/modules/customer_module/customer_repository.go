@@ -196,7 +196,7 @@ func (r Repository) CreateCustomer(ctx context.Context, name string) (models.Cus
 // CreateCustomerAddress adds a new address for a customer. When isDefault is
 // true, every other address of this customer is demoted first so at most
 // one stays default.
-func (r Repository) CreateCustomerAddress(ctx context.Context, customerID int, address string, label string, isDefault bool) (models.CustomerAddress, error) {
+func (r Repository) CreateCustomerAddress(ctx context.Context, customerID int, address string, isDefault bool) (models.CustomerAddress, error) {
 	var (
 		_, childSpan = r.tracer.TraceStart(ctx, "CreateCustomerAddressRepository", trace.WithAttributes(attribute.String("repository", "CreateCustomerAddress"), attribute.Int("customerId", customerID)))
 		record       models.CustomerAddress
@@ -221,7 +221,6 @@ func (r Repository) CreateCustomerAddress(ctx context.Context, customerID int, a
 				record = models.CustomerAddress{
 					CustomerID: customerID,
 					Address:    address,
-					Label:      label,
 					IsDefault:  isDefault,
 				}
 				return tx.Create(&record).Error
@@ -255,7 +254,7 @@ func (r Repository) CreateCustomerAddress(ctx context.Context, customerID int, a
 // CreateCustomerPhone adds a new phone number for a customer. When isDefault
 // is true, every other phone of this customer is demoted first so at most
 // one stays default.
-func (r Repository) CreateCustomerPhone(ctx context.Context, customerID int, phone string, label string, isDefault bool) (models.CustomerPhone, error) {
+func (r Repository) CreateCustomerPhone(ctx context.Context, customerID int, phone string, isDefault bool) (models.CustomerPhone, error) {
 	var (
 		_, childSpan = r.tracer.TraceStart(ctx, "CreateCustomerPhoneRepository", trace.WithAttributes(attribute.String("repository", "CreateCustomerPhone"), attribute.Int("customerId", customerID)))
 		record       models.CustomerPhone
@@ -280,7 +279,6 @@ func (r Repository) CreateCustomerPhone(ctx context.Context, customerID int, pho
 				record = models.CustomerPhone{
 					CustomerID: customerID,
 					Phone:      phone,
-					Label:      label,
 					IsDefault:  isDefault,
 				}
 				return tx.Create(&record).Error
