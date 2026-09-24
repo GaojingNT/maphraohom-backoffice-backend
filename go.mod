@@ -21,6 +21,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.74
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/rotisserie/eris v0.5.4
+	github.com/shopspring/decimal v1.4.0
 	github.com/stoewer/go-strcase v1.3.0
 	github.com/swaggo/swag v1.16.3
 	go.elastic.co/ecszap v1.0.2
@@ -86,7 +87,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/xid v1.5.0 // indirect
-	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/swaggo/files/v2 v2.0.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0 // indirect

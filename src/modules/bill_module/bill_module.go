@@ -20,6 +20,7 @@ type (
 	Service struct {
 		tracer     *tracing.MyTracer
 		fileSystem *storage.FileSystem
+		log        *logger.Logger
 	}
 	Repository struct {
 		db     *gorm.DB
@@ -46,6 +47,7 @@ func NewService() Service {
 	return Service{
 		tracer:     tracing.CurrentTracer(),
 		fileSystem: storage.CurrentFileStorage(),
+		log:        logger.CurrentLogger(),
 	}
 }
 

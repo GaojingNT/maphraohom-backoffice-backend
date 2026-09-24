@@ -30,16 +30,13 @@ var productSeeds = []struct {
 	{"น้ำมะพร้าว", "ขวด"},
 }
 
-// seedProducts inserts all products and returns a name→ID map for price linking.
-func seedProducts(db *gorm.DB) map[string]uint {
-	productMap := make(map[string]uint, len(productSeeds))
+// seedProducts inserts all products.
+func seedProducts(db *gorm.DB) {
 	for _, ps := range productSeeds {
 		p := models.Product{Name: ps.Name, Unit: ps.Unit}
 		if err := db.Create(&p).Error; err != nil {
 			log.Fatalf("[Seed] product %q: %v", ps.Name, err)
 		}
-		productMap[ps.Name] = uint(p.ID)
 		log.Printf("[Seed] Product: #%d %s (%s)", p.ID, p.Name, p.Unit)
 	}
-	return productMap
 }
