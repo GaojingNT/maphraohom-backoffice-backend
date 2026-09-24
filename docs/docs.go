@@ -2014,6 +2014,9 @@ const docTemplate = `{
                 "slipUrl": {
                     "type": "string"
                 },
+                "storeAddress": {
+                    "type": "string"
+                },
                 "storeId": {
                     "type": "integer"
                 },
@@ -2021,6 +2024,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "storeName": {
+                    "type": "string"
+                },
+                "storePhone": {
+                    "type": "string"
+                },
+                "storeSignature": {
                     "type": "string"
                 },
                 "total": {
