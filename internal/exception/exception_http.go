@@ -25,14 +25,6 @@ func HttpErrorResponseMapping(c *fiber.Ctx, code int, errResponse *ErrorResponse
 		isResponseOK = true
 		fiberResponseStatus = fiber.StatusBadRequest
 		fiberResponseBody = errorMessage
-	case ErrPromotionOverlap:
-		errorMessage := &ErrorResponse{
-			Code:    PromotionOverlapResponseError.Code,
-			Message: fmt.Sprintf("%s, %s", PromotionOverlapResponseError.Message, PromotionOverlapMessage),
-		}
-		isResponseOK = true
-		fiberResponseStatus = fiber.StatusBadRequest
-		fiberResponseBody = errorMessage
 	// Application errors
 	case ErrInvalidRequestParameter:
 		isResponseOK = true

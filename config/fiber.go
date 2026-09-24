@@ -42,6 +42,9 @@ func NewFiberConfig() *fiberConfig {
 		AppName:                 os.Getenv("APP_NAME"),
 		JSONEncoder:             json.Marshal,
 		JSONDecoder:             json.Unmarshal,
+		// Fiber's default (4MB) is too small for a 10MB bill slip upload
+		// (PUT /api/v1/bills/:id/slip) — bumped with a little headroom.
+		BodyLimit: 12 * 1024 * 1024,
 	}
 
 	ETagConfig := etag.Config{

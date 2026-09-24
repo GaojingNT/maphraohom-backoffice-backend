@@ -267,7 +267,7 @@
         },
         "/api/v1/bills": {
             "get": {
-                "description": "Get bills (paginated) — id, storeId, storeName, receiptNo,\ncustomerName, customerAddress, total, totalKilogram, itemCount, createdAt",
+                "description": "Get bills (paginated) — id, type, storeId, storeName, bookNo,\nreceiptNo, customerName, customerAddress, total, itemCount, hasSlip, createdAt",
                 "consumes": [
                     "application/json"
                 ],
@@ -299,14 +299,26 @@
                     },
                     {
                         "type": "string",
-                        "description": "filter by created_at: day, week, month, or year",
-                        "name": "period",
+                        "description": "filter by bill type: receipt or payment",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "filter by store id",
+                        "name": "storeId",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "reference date for period, YYYY-MM-DD (default: today)",
-                        "name": "date",
+                        "description": "filter created_at \u003e= this date, YYYY-MM-DD",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter created_at \u003c= this date, YYYY-MM-DD",
+                        "name": "to",
                         "in": "query"
                     }
                 ],
@@ -315,6 +327,12 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/paginator.Pagination"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
                         }
                     },
                     "500": {
@@ -326,9 +344,9 @@
                 }
             },
             "post": {
-                "description": "Create a bill with one or more line items. Book/receipt\nnumbers and each item's price are computed server-side (price\nlooked up from the store's current product price); the receipt\nnumber resets every 50 receipts (new book) and every calendar\nyear (back to book 1 / receipt 1).",
+                "description": "Create a bill (JSON) with one or more line items, priced by the\ncaller (no price list). Book/receipt numbers are computed\nserver-side, scoped per (store, type); unit/subtotal/total and\nanything else derivable are ignored if the client sends them.",
                 "consumes": [
-                    "multipart/form-data"
+                    "application/json"
                 ],
                 "produces": [
                     "application/json"
@@ -339,55 +357,18 @@
                 "summary": "Create bill",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "store id",
-                        "name": "storeId",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "customer name",
-                        "name": "customerName",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "customer address",
-                        "name": "customerAddress",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "JSON array, e.g. [{\\",
-                        "name": "items",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "number",
-                        "description": "discount",
-                        "name": "discount",
-                        "in": "formData"
-                    },
-                    {
-                        "type": "number",
-                        "description": "shipping fee",
-                        "name": "shippingFee",
-                        "in": "formData"
-                    },
-                    {
-                        "type": "file",
-                        "description": "slip image",
-                        "name": "slip",
-                        "in": "formData"
+                        "description": "bill",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtos.CreateBill"
+                        }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "201": {
+                        "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/responses.BillDetailResponse"
                         }
@@ -409,7 +390,7 @@
         },
         "/api/v1/bills/{id}": {
             "get": {
-                "description": "Get bill by id — every bills column except deleted_at",
+                "description": "Get bill by id — every bills column except deleted_at, plus a ready-to-use slipUrl",
                 "consumes": [
                     "application/json"
                 ],
@@ -451,9 +432,9 @@
                 }
             },
             "put": {
-                "description": "Replace a bill's store, customer, items, discount, shipping\nfee, and (optionally) slip. Book/receipt numbers are kept as-is;\neach item's price is re-looked-up from the store's current\nproduct price, same as create.",
+                "description": "Replace a bill's customer, items, discount, and shipping fee\n(JSON, same shape as create). storeId and type must match the\nexisting bill — sending different values is rejected with 400.\nBook/receipt numbers and the slip are never touched here.",
                 "consumes": [
-                    "multipart/form-data"
+                    "application/json"
                 ],
                 "produces": [
                     "application/json"
@@ -471,56 +452,13 @@
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "store id",
-                        "name": "storeId",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "customer name",
-                        "name": "customerName",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "customer address",
-                        "name": "customerAddress",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "JSON array, e.g. [{\\",
-                        "name": "items",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "number",
-                        "description": "discount",
-                        "name": "discount",
-                        "in": "formData"
-                    },
-                    {
-                        "type": "number",
-                        "description": "shipping fee",
-                        "name": "shippingFee",
-                        "in": "formData"
-                    },
-                    {
-                        "type": "file",
-                        "description": "new slip image (replaces the existing one)",
-                        "name": "slip",
-                        "in": "formData"
-                    },
-                    {
-                        "type": "boolean",
-                        "description": "clear the existing slip (ignored if a new slip is uploaded)",
-                        "name": "removeSlip",
-                        "in": "formData"
+                        "description": "bill",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtos.UpdateBill"
+                        }
                     }
                 ],
                 "responses": {
@@ -551,7 +489,7 @@
                 }
             },
             "delete": {
-                "description": "Delete bill by id",
+                "description": "Delete bill by id — soft delete only, slip and book/receipt number are kept as-is (never reused)",
                 "consumes": [
                     "application/json"
                 ],
@@ -562,6 +500,110 @@
                     "Bill Module (Version 1)"
                 ],
                 "summary": "Delete bill",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "bill id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http_response.OkResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/bills/{id}/slip": {
+            "put": {
+                "description": "Upload a slip image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing, non-deleted bill. Replaces any existing slip.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Bill Module (Version 1)"
+                ],
+                "summary": "Upload a bill's slip",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "bill id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "slip image",
+                        "name": "slip",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "slipUrl": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Clear a bill's slip and remove the underlying file (best-effort)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Bill Module (Version 1)"
+                ],
+                "summary": "Delete a bill's slip",
                 "parameters": [
                     {
                         "type": "integer",
@@ -631,6 +673,50 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/paginator.Pagination"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a new customer by name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customer Module (Version 1)"
+                ],
+                "summary": "Create customer",
+                "parameters": [
+                    {
+                        "description": "customer",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtos.CreateCustomer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.CustomerDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
                         }
                     },
                     "500": {
@@ -725,6 +811,161 @@
                         }
                     }
                 }
+            },
+            "post": {
+                "description": "Add a new address for a customer, optionally marking it default",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customer Module (Version 1)"
+                ],
+                "summary": "Add a customer address",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "customer id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "address",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtos.CreateCustomerAddress"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.CustomerAddressItem"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/customers/{id}/phones": {
+            "get": {
+                "description": "Get every phone number on file for this customer (default-first)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customer Module (Version 1)"
+                ],
+                "summary": "List a customer's phone numbers",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "customer id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/responses.CustomerPhoneItem"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Add a new phone number for a customer, optionally marking it default",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customer Module (Version 1)"
+                ],
+                "summary": "Add a customer phone number",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "customer id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "phone",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtos.CreateCustomerPhone"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.CustomerPhoneItem"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/api/v1/files/{path}": {
@@ -760,6 +1001,38 @@
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/products": {
+            "get": {
+                "description": "Get every product (id, name, unit)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Product Module (Version 1)"
+                ],
+                "summary": "List products",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/responses.ProductListItem"
+                            }
                         }
                     },
                     "500": {
@@ -864,9 +1137,9 @@
                 }
             }
         },
-        "/api/v1/stores/{id}/products": {
+        "/api/v1/stores/{storeId}/last-prices": {
             "get": {
-                "description": "Get every product's currently effective price at this store",
+                "description": "Get, for every product, the price used in this store's most recent bill of the given type — used to prefill the create-bill form (optional).",
                 "consumes": [
                     "application/json"
                 ],
@@ -876,13 +1149,20 @@
                 "tags": [
                     "Store Module (Version 1)"
                 ],
-                "summary": "List a store's product prices",
+                "summary": "List a store's last-used prices",
                 "parameters": [
                     {
                         "type": "integer",
                         "description": "store id",
-                        "name": "id",
+                        "name": "storeId",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "bill type: receipt or payment",
+                        "name": "type",
+                        "in": "query",
                         "required": true
                     }
                 ],
@@ -892,57 +1172,12 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/responses.StoreProductPriceItem"
+                                "$ref": "#/definitions/responses.LastPriceItem"
                             }
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/exception.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/stores/{id}/products/{productId}": {
-            "get": {
-                "description": "Get a single product's currently effective price at this store",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Store Module (Version 1)"
-                ],
-                "summary": "Get a store's price for one product",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "store id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "product id",
-                        "name": "productId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/responses.StoreProductPriceItem"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/exception.ErrorResponse"
                         }
@@ -1256,6 +1491,129 @@
         }
     },
     "definitions": {
+        "dtos.CreateBill": {
+            "type": "object",
+            "properties": {
+                "customerAddress": {
+                    "type": "string"
+                },
+                "customerId": {
+                    "type": "integer"
+                },
+                "customerName": {
+                    "type": "string"
+                },
+                "customerPhone": {
+                    "type": "string"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtos.CreateBillItem"
+                    }
+                },
+                "shippingFee": {
+                    "type": "number"
+                },
+                "storeId": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtos.CreateBillItem": {
+            "type": "object",
+            "properties": {
+                "price": {
+                    "type": "number"
+                },
+                "productId": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "number"
+                }
+            }
+        },
+        "dtos.CreateCustomer": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtos.CreateCustomerAddress": {
+            "type": "object",
+            "required": [
+                "address"
+            ],
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "isDefault": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dtos.CreateCustomerPhone": {
+            "type": "object",
+            "required": [
+                "phone"
+            ],
+            "properties": {
+                "isDefault": {
+                    "type": "boolean"
+                },
+                "phone": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtos.UpdateBill": {
+            "type": "object",
+            "properties": {
+                "customerAddress": {
+                    "type": "string"
+                },
+                "customerId": {
+                    "type": "integer"
+                },
+                "customerName": {
+                    "type": "string"
+                },
+                "customerPhone": {
+                    "type": "string"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtos.CreateBillItem"
+                    }
+                },
+                "shippingFee": {
+                    "type": "number"
+                },
+                "storeId": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "exception.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -1344,6 +1702,9 @@
                 "customerName": {
                     "type": "string"
                 },
+                "customerPhone": {
+                    "type": "string"
+                },
                 "discount": {
                     "type": "number"
                 },
@@ -1362,7 +1723,7 @@
                 "shippingFee": {
                     "type": "number"
                 },
-                "slip": {
+                "slipUrl": {
                     "type": "string"
                 },
                 "storeId": {
@@ -1377,6 +1738,9 @@
                 "total": {
                     "type": "number"
                 },
+                "type": {
+                    "type": "string"
+                },
                 "updatedAt": {
                     "type": "string"
                 }
@@ -1388,9 +1752,6 @@
                 "id": {
                     "type": "integer"
                 },
-                "kilogram": {
-                    "type": "number"
-                },
                 "price": {
                     "type": "number"
                 },
@@ -1400,8 +1761,14 @@
                 "productName": {
                     "type": "string"
                 },
+                "quantity": {
+                    "type": "number"
+                },
                 "subtotal": {
                     "type": "number"
+                },
+                "unit": {
+                    "type": "string"
                 }
             }
         },
@@ -1420,9 +1787,6 @@
                 "isDefault": {
                     "type": "boolean"
                 },
-                "label": {
-                    "type": "string"
-                },
                 "updatedAt": {
                     "type": "string"
                 }
@@ -1439,6 +1803,26 @@
                 },
                 "name": {
                     "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.CustomerPhoneItem": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "isDefault": {
+                    "type": "boolean"
                 },
                 "phone": {
                     "type": "string"
@@ -1607,6 +1991,31 @@
                 }
             }
         },
+        "responses.LastPriceItem": {
+            "type": "object",
+            "properties": {
+                "price": {
+                    "type": "number"
+                },
+                "productId": {
+                    "type": "integer"
+                }
+            }
+        },
+        "responses.ProductListItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
+                }
+            }
+        },
         "responses.StoreDetailResponse": {
             "type": "object",
             "properties": {
@@ -1623,23 +2032,6 @@
                     "type": "string"
                 },
                 "updatedAt": {
-                    "type": "string"
-                }
-            }
-        },
-        "responses.StoreProductPriceItem": {
-            "type": "object",
-            "properties": {
-                "effectiveFrom": {
-                    "type": "string"
-                },
-                "price": {
-                    "type": "number"
-                },
-                "productId": {
-                    "type": "integer"
-                },
-                "productName": {
                     "type": "string"
                 }
             }

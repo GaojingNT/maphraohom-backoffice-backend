@@ -6,6 +6,7 @@ import (
 	"log"
 	"mime/multipart"
 	"os"
+	"path/filepath"
 
 	"maphraohom.app/maphraohom-backoffice/config"
 )
@@ -55,6 +56,13 @@ func (f *FileSystem) putFileToLocalStorage(path string, fileName string, filePar
 		}()
 	} else {
 		return fmt.Errorf("[App] FileSystemError: invalid file parameter")
+	}
+
+	// Create the destination folder if it doesn't exist yet — callers like
+	// bill_module's slip upload use a dynamic, previously-unseen subfolder
+	// per day (slip/YYYY-MM-DD/...), which os.WriteFile alone won't create.
+	if err = os.MkdirAll(filepath.Dir(filePath), 0777); err != nil {
+		return err
 	}
 
 	// Write the content

@@ -12,9 +12,6 @@ type CustomerAddress struct {
 	// Fields
 	Address string `json:"address" gorm:"column:address;size:255;not null;"`
 
-	// Label is an optional free-form tag, e.g. "บ้าน", "สวน", "จุดรับของ 2".
-	Label string `json:"label,omitempty" gorm:"column:label;size:100;"`
-
 	// IsDefault marks the address used to prefill new bills. Only one
 	// address per customer may be default — enforced by the partial unique
 	// index above (customer_id, where is_default = true) and mirrored by

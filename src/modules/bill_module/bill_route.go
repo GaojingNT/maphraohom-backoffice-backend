@@ -15,4 +15,6 @@ func (m module) Routes(route fiber.Router, middleware *middlewares.Middleware) {
 	bill.Post("", func(c *fiber.Ctx) error { return m.Controller().CreateBill(c) })
 	bill.Put(":id", func(c *fiber.Ctx) error { return m.Controller().UpdateBill(c) })
 	bill.Delete(":id", func(c *fiber.Ctx) error { return m.Controller().DeleteBill(c) })
+	bill.Put(":id/slip", func(c *fiber.Ctx) error { return m.Controller().UploadSlip(c) })
+	bill.Delete(":id/slip", func(c *fiber.Ctx) error { return m.Controller().DeleteSlip(c) })
 }

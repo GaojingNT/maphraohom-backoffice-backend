@@ -1,36 +1,45 @@
 package dtos
 
-type CreateBill struct {
-	StoreID         int     `form:"storeId" validate:"required"`
-	CustomerName    string  `form:"customerName" validate:"required"`
-	CustomerAddress string  `form:"customerAddress" validate:"required"`
-	CustomerPhone   string  `form:"customerPhone"`
-	Discount        float64 `form:"discount"`
-	ShippingFee     float64 `form:"shippingFee"`
+import "github.com/shopspring/decimal"
 
-	// Items is a JSON-encoded array of CreateBillItem, e.g.:
-	// [{"productId":1,"quantity":2.5},{"productId":3,"quantity":1.2}]
-	// (kept as a plain form field since multipart/form-data has no native
-	// array-of-objects encoding).
-	Items string `form:"items" validate:"required"`
-}
-
+// CreateBillItem is one line item of a create/update-bill request. Price is
+// entered by the user — there is no price list to look up. Server computes
+// Unit (from the product) and Subtotal; anything the client sends for those
+// is ignored.
 type CreateBillItem struct {
-	ProductID int     `json:"productId" validate:"required"`
-	Quantity  float64 `json:"quantity" validate:"required,gt=0"`
+	ProductID int             `json:"productId"`
+	Quantity  decimal.Decimal `json:"quantity"`
+	Price     decimal.Decimal `json:"price"`
 }
 
-// UpdateBill replaces a bill's editable fields and its full set of line
-// items (existing items are deleted and recreated, not diffed). Book/receipt
-// numbers never change on edit. RemoveSlip clears an existing slip when no
-// new one is uploaded in its place.
+// CreateBill is the JSON body of POST /api/v1/bills. Type, StoreID, and
+// Items are required; CustomerID/Discount/ShippingFee default to
+// nil/0/0 when omitted. Server computes Unit/Subtotal/Total/BookNo/ReceiptNo
+// — anything the client sends for those fields is ignored.
+type CreateBill struct {
+	Type            string           `json:"type"`
+	StoreID         int              `json:"storeId"`
+	CustomerID      *int             `json:"customerId,omitempty"`
+	CustomerName    string           `json:"customerName"`
+	CustomerAddress string           `json:"customerAddress"`
+	CustomerPhone   string           `json:"customerPhone"`
+	Discount        decimal.Decimal  `json:"discount"`
+	ShippingFee     decimal.Decimal  `json:"shippingFee"`
+	Items           []CreateBillItem `json:"items"`
+}
+
+// UpdateBill is the JSON body of PUT /api/v1/bills/:id — same shape as
+// CreateBill. StoreID and Type must match the existing bill's values (the
+// service rejects the request with 400 otherwise); Items replace the bill's
+// entire line-item set. BookNo/ReceiptNo and the slip are never touched.
 type UpdateBill struct {
-	StoreID         int     `form:"storeId" validate:"required"`
-	CustomerName    string  `form:"customerName" validate:"required"`
-	CustomerAddress string  `form:"customerAddress" validate:"required"`
-	CustomerPhone   string  `form:"customerPhone"`
-	Discount        float64 `form:"discount"`
-	ShippingFee     float64 `form:"shippingFee"`
-	Items           string  `form:"items" validate:"required"`
-	RemoveSlip      bool    `form:"removeSlip"`
+	Type            string           `json:"type"`
+	StoreID         int              `json:"storeId"`
+	CustomerID      *int             `json:"customerId,omitempty"`
+	CustomerName    string           `json:"customerName"`
+	CustomerAddress string           `json:"customerAddress"`
+	CustomerPhone   string           `json:"customerPhone"`
+	Discount        decimal.Decimal  `json:"discount"`
+	ShippingFee     decimal.Decimal  `json:"shippingFee"`
+	Items           []CreateBillItem `json:"items"`
 }

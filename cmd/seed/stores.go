@@ -7,32 +7,22 @@ import (
 	"maphraohom.app/maphraohom-backoffice/src/models"
 )
 
-type storeSeed struct {
+// storeSeeds lists each store. Prices are no longer master data — staff
+// type a price per unit into every bill item, so nothing is seeded here.
+var storeSeeds = []struct {
 	Name string
-
-	// BasePrice applies to every product except น้ำมะพร้าว, which is sold
-	// by the bottle and priced separately via BottlePrice.
-	BasePrice   float64
-	BottlePrice float64
+}{
+	{Name: "มะพร้าวหอมอัมพวา"},
+	{Name: "หอมละมุน มะพร้าวน้ำหอม"},
 }
 
-// storeSeeds defines each store and its per-product base prices.
-var storeSeeds = []storeSeed{
-	{
-		Name:        "มะพร้าวหอมอัมพวา",
-		BasePrice:   80,
-		BottlePrice: 20,
-	},
-	{
-		Name:        "หอมละมุน มะพร้าวน้ำหอม",
-		BasePrice:   100,
-		BottlePrice: 25,
-	},
-}
+// billSequenceTypes lists every bill type a fresh store needs a numbering
+// row for.
+var billSequenceTypes = []string{models.BillTypeReceipt, models.BillTypePayment}
 
-// seedStores creates each store and its store-product prices. Promotions are
-// no longer seeded here — manage those through the admin UI instead.
-func seedStores(db *gorm.DB, productMap map[string]uint) {
+// seedStores creates each store and its bill_sequences rows (one per bill
+// type, both starting at book/receipt 0).
+func seedStores(db *gorm.DB) {
 	for _, ss := range storeSeeds {
 		store := models.Store{Name: ss.Name}
 		if err := db.Create(&store).Error; err != nil {
@@ -40,26 +30,12 @@ func seedStores(db *gorm.DB, productMap map[string]uint) {
 		}
 		log.Printf("[Seed] Store: #%d %s", store.ID, store.Name)
 
-		for _, ps := range productSeeds {
-			productID, ok := productMap[ps.Name]
-			if !ok {
-				log.Fatalf("[Seed] product %q not found", ps.Name)
+		for _, billType := range billSequenceTypes {
+			sequence := models.BillSequence{StoreID: store.ID, Type: billType}
+			if err := db.Create(&sequence).Error; err != nil {
+				log.Fatalf("[Seed] bill sequence store %q / type %q: %v", ss.Name, billType, err)
 			}
-
-			price := ss.BasePrice
-			if ps.Unit == "ขวด" {
-				price = ss.BottlePrice
-			}
-
-			spp := models.StoreProductPrice{
-				StoreID:   store.ID,
-				ProductID: int(productID),
-				Price:     price,
-			}
-			if err := db.Create(&spp).Error; err != nil {
-				log.Fatalf("[Seed] price store %q / product %q: %v", ss.Name, ps.Name, err)
-			}
-			log.Printf("[Seed]   Price: store #%d × product #%d (%s) = %.2f ฿", store.ID, productID, ps.Name, price)
+			log.Printf("[Seed]   BillSequence: store #%d × type %s", store.ID, billType)
 		}
 	}
 }

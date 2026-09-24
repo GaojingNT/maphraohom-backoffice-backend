@@ -21,6 +21,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.74
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/rotisserie/eris v0.5.4
+	github.com/shopspring/decimal v1.4.0
 	github.com/stoewer/go-strcase v1.3.0
 	github.com/swaggo/swag v1.16.3
 	go.elastic.co/ecszap v1.0.2

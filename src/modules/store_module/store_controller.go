@@ -5,10 +5,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
-	"maphraohom.app/maphraohom-backoffice/internal/validator"
 	"maphraohom.app/maphraohom-backoffice/pkg/database/paginator"
 	"maphraohom.app/maphraohom-backoffice/src/models"
-	"maphraohom.app/maphraohom-backoffice/src/modules/store_module/dtos"
 )
 
 // GetStores lists all existing stores
@@ -81,116 +79,35 @@ func (c Controller) GetStore(f *fiber.Ctx) error {
 	return f.Status(fiber.StatusOK).JSON(responseData)
 }
 
-// GetStoreProducts lists every product's currently effective price at a store
+// GetLastPrices lists, per product, the price last used at this store for a
+// given bill type
 //
-//	@Summary		List a store's product prices
-//	@Description	Get every product's currently effective price at this store
+//	@Summary		List a store's last-used prices
+//	@Description	Get, for every product, the price used in this store's most recent bill of the given type — used to prefill the create-bill form (optional).
 //	@Tags			Store Module (Version 1)
 //	@Accept			json
 //	@Produce		json
-//	@Param			id	path		int	true	"store id"
-//	@Success		200	{array}		responses.StoreProductPriceItem
-//	@Failure		500	{object}	exception.ErrorResponse
-//	@Router			/api/v1/stores/{id}/products [get]
-func (c Controller) GetStoreProducts(f *fiber.Ctx) error {
-	storeID, _ := f.ParamsInt("id")
-	ctx, span := c.m.tracer.TraceStart(f.Context(), "GetStoreProductsController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "GetStoreProducts"), attribute.Int("storeId", storeID)))
+//	@Param			storeId	path		int		true	"store id"
+//	@Param			type	query		string	true	"bill type: receipt or payment"
+//	@Success		200		{array}		responses.LastPriceItem
+//	@Failure		400		{object}	exception.ErrorResponse
+//	@Failure		500		{object}	exception.ErrorResponse
+//	@Router			/api/v1/stores/{storeId}/last-prices [get]
+func (c Controller) GetLastPrices(f *fiber.Ctx) error {
+	storeID, _ := f.ParamsInt("storeId")
+	billType := f.Query("type")
+	ctx, span := c.m.tracer.TraceStart(f.Context(), "GetLastPricesController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "GetLastPrices"), attribute.Int("storeId", storeID), attribute.String("type", billType)))
 
-	responseData, err := c.storeService().GetStoreProducts(ctx, storeID)
+	if !models.IsValidBillType(billType) {
+		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, exception.ErrInvalidRequestParameter, exception.ParameterError{
+			FailedField: "type",
+			Tag:         "oneof=receipt payment",
+			Value:       billType,
+		})
+	}
+
+	responseData, err := c.storeService().GetLastPrices(ctx, storeID, billType)
 	if err != nil {
-		return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
-	}
-
-	c.m.tracer.TraceEnd(span)
-	return f.Status(fiber.StatusOK).JSON(responseData)
-}
-
-// GetStoreBasePrices lists a store's editable base prices, never resolved
-// against an active promotion
-//
-//	@Summary		List a store's editable base prices
-//	@Description	Get every product's raw base price at this store (ignores active promotions) — for the price-management admin screen
-//	@Tags			Store Module (Version 1)
-//	@Accept			json
-//	@Produce		json
-//	@Param			id	path		int	true	"store id"
-//	@Success		200	{array}		responses.StoreProductBasePriceItem
-//	@Failure		500	{object}	exception.ErrorResponse
-//	@Router			/api/v1/stores/{id}/base-prices [get]
-func (c Controller) GetStoreBasePrices(f *fiber.Ctx) error {
-	storeID, _ := f.ParamsInt("id")
-	ctx, span := c.m.tracer.TraceStart(f.Context(), "GetStoreBasePricesController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "GetStoreBasePrices"), attribute.Int("storeId", storeID)))
-
-	responseData, err := c.storeService().GetStoreBasePrices(ctx, storeID)
-	if err != nil {
-		return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
-	}
-
-	c.m.tracer.TraceEnd(span)
-	return f.Status(fiber.StatusOK).JSON(responseData)
-}
-
-// UpdateStoreProductPrice sets a store's base price for one product
-//
-//	@Summary		Update a store's base price for one product
-//	@Description	Set the store's base price for one product (upserts the (store, product) row — no history is kept)
-//	@Tags			Store Module (Version 1)
-//	@Accept			json
-//	@Produce		json
-//	@Param			id			path		int								true	"store id"
-//	@Param			productId	path		int								true	"product id"
-//	@Param			body		body		dtos.UpdateStoreProductPrice	true	"price"
-//	@Success		200			{object}	responses.StoreProductBasePriceItem
-//	@Failure		400			{object}	exception.ErrorResponse
-//	@Failure		500			{object}	exception.ErrorResponse
-//	@Router			/api/v1/stores/{id}/products/{productId} [put]
-func (c Controller) UpdateStoreProductPrice(f *fiber.Ctx) error {
-	storeID, _ := f.ParamsInt("id")
-	productID, _ := f.ParamsInt("productId")
-	ctx, span := c.m.tracer.TraceStart(f.Context(), "UpdateStoreProductPriceController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "UpdateStoreProductPrice"), attribute.Int("storeId", storeID), attribute.Int("productId", productID)))
-
-	dto := new(dtos.UpdateStoreProductPrice)
-	if err := f.BodyParser(dto); err != nil {
-		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, err)
-	}
-
-	errors := validator.Validate(*dto)
-	if errors != nil {
-		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, exception.ErrInvalidRequestParameter, errors...)
-	}
-
-	responseData, err := c.storeService().UpdateStoreProductPrice(ctx, storeID, productID, dto.Price)
-	if err != nil {
-		return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
-	}
-
-	c.m.tracer.TraceEnd(span)
-	return f.Status(fiber.StatusOK).JSON(responseData)
-}
-
-// GetStoreProduct gets one product's currently effective price at a store
-//
-//	@Summary		Get a store's price for one product
-//	@Description	Get a single product's currently effective price at this store
-//	@Tags			Store Module (Version 1)
-//	@Accept			json
-//	@Produce		json
-//	@Param			id			path		int	true	"store id"
-//	@Param			productId	path		int	true	"product id"
-//	@Success		200			{object}	responses.StoreProductPriceItem
-//	@Failure		404			{object}	exception.ErrorResponse
-//	@Failure		500			{object}	exception.ErrorResponse
-//	@Router			/api/v1/stores/{id}/products/{productId} [get]
-func (c Controller) GetStoreProduct(f *fiber.Ctx) error {
-	storeID, _ := f.ParamsInt("id")
-	productID, _ := f.ParamsInt("productId")
-	ctx, span := c.m.tracer.TraceStart(f.Context(), "GetStoreProductController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "GetStoreProduct"), attribute.Int("storeId", storeID), attribute.Int("productId", productID)))
-
-	responseData, err := c.storeService().GetStoreProduct(ctx, storeID, productID)
-	if err != nil {
-		if err == exception.ErrRecordNotFound {
-			return exception.HttpErrorResponseMapping(f, fiber.StatusNotFound, exception.RecordNotFoundResponseError, err)
-		}
 		return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
 	}
 

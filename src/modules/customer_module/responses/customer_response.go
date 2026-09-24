@@ -23,7 +23,6 @@ type (
 	CustomerAddressItem struct {
 		ID        int    `json:"id"`
 		Address   string `json:"address"`
-		Label     string `json:"label,omitempty"`
 		IsDefault bool   `json:"isDefault"`
 		CreatedAt string `json:"createdAt"`
 		UpdatedAt string `json:"updatedAt"`
@@ -33,7 +32,6 @@ type (
 	CustomerPhoneItem struct {
 		ID        int    `json:"id"`
 		Phone     string `json:"phone"`
-		Label     string `json:"label,omitempty"`
 		IsDefault bool   `json:"isDefault"`
 		CreatedAt string `json:"createdAt"`
 		UpdatedAt string `json:"updatedAt"`
@@ -66,7 +64,6 @@ func (CustomerAddressItem) Make(address models.CustomerAddress) CustomerAddressI
 	return CustomerAddressItem{
 		ID:        address.ID,
 		Address:   address.Address,
-		Label:     address.Label,
 		IsDefault: address.IsDefault,
 		CreatedAt: address.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt: address.UpdatedAt.Format("2006-01-02 15:04:05"),
@@ -85,7 +82,6 @@ func (CustomerPhoneItem) Make(phone models.CustomerPhone) CustomerPhoneItem {
 	return CustomerPhoneItem{
 		ID:        phone.ID,
 		Phone:     phone.Phone,
-		Label:     phone.Label,
 		IsDefault: phone.IsDefault,
 		CreatedAt: phone.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt: phone.UpdatedAt.Format("2006-01-02 15:04:05"),
