@@ -124,9 +124,9 @@ func TestValidateBillInput_KilogramFractionIsValid(t *testing.T) {
 
 func TestValidateBillInput_MultipleRowErrorsAreAllReported(t *testing.T) {
 	items := []dtos.CreateBillItem{
-		{ProductID: 1, Quantity: d("1"), Price: d("1")},      // valid
-		{ProductID: 2, Quantity: d("1.5"), Price: d("0")},    // bad quantity (bottle) and price
-		{ProductID: 999, Quantity: d("1"), Price: d("1")},    // unknown product
+		{ProductID: 1, Quantity: d("1"), Price: d("1")},   // valid
+		{ProductID: 2, Quantity: d("1.5"), Price: d("0")}, // bad quantity (bottle) and price
+		{ProductID: 999, Quantity: d("1"), Price: d("1")}, // unknown product
 	}
 
 	errs := validateBillInput(models.BillTypeReceipt, d("0"), d("0"), items, testProducts)
