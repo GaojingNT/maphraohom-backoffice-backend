@@ -163,6 +163,7 @@ func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill) (*respons
 		ShippingFee:     dto.ShippingFee,
 		Total:           total,
 		Items:           pricedItems,
+		CreatedAt:       dto.CreatedAt,
 	})
 	if err != nil {
 		return nil, nil, err
