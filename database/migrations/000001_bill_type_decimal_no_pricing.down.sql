@@ -6,6 +6,14 @@
 -- tbl_bill_items, tbl_products, tbl_customer_addresses, and
 -- tbl_customer_phones, and removes tbl_bill_sequences. Bill data itself
 -- (tbl_bills, tbl_bill_items rows) is preserved throughout.
+--
+-- Not reversed: the legacy pre-bill_items tbl_bills.product_id/kilogram/price
+-- columns (dropped by the up migration only when tbl_bills was empty — there
+-- is nothing meaningful to restore into them), the tbl_bill_items.kilogram
+-- rename (renaming back is harmless but not done here since nothing reads
+-- that name anymore), and tbl_customer_phones itself (created by the up
+-- migration on a deployment that didn't have it yet — dropping it here could
+-- discard real phone rows added since).
 BEGIN;
 
 DROP INDEX IF EXISTS tbl_bills_store_type_created_idx;
@@ -18,6 +26,7 @@ ALTER TABLE tbl_customer_addresses ADD COLUMN IF NOT EXISTS label varchar(100);
 
 ALTER TABLE tbl_bills DROP CONSTRAINT IF EXISTS tbl_bills_type_chk;
 ALTER TABLE tbl_bills DROP COLUMN IF EXISTS type;
+ALTER TABLE tbl_bills DROP COLUMN IF EXISTS customer_phone;
 
 ALTER TABLE tbl_bills DROP CONSTRAINT IF EXISTS tbl_bills_shipping_nonneg_chk;
 ALTER TABLE tbl_bills DROP CONSTRAINT IF EXISTS tbl_bills_discount_nonneg_chk;

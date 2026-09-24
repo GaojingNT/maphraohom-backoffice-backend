@@ -36,9 +36,17 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 -- 3) bill_items: quantity/unit/price/subtotal ----------------------------------------------
--- Note: this codebase's bill_items column is already named "quantity" (not
--- "kilogram" as an older draft of the spec assumed), so there is nothing to
--- rename here.
+-- In the current codebase's models this column is already named "quantity"
+-- (not "kilogram" as an older draft of the spec assumed) — but some
+-- deployments' actual tables still carry the older "kilogram" name, so rename
+-- it only when that's the case.
+
+DO $$ BEGIN
+	IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tbl_bill_items' AND column_name = 'kilogram')
+		AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tbl_bill_items' AND column_name = 'quantity') THEN
+		ALTER TABLE tbl_bill_items RENAME COLUMN kilogram TO quantity;
+	END IF;
+END $$;
 
 ALTER TABLE tbl_bill_items ADD COLUMN IF NOT EXISTS unit varchar(20);
 
@@ -71,6 +79,33 @@ DO $$ BEGIN
 		CHECK (unit <> 'ขวด' OR quantity = trunc(quantity)) NOT VALID;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
+-- 3b) bills: legacy pre-bill_items columns + missing customer_phone -------------------------
+-- Some deployments' tbl_bills still carries product_id/kilogram/price
+-- directly on the bill from before line items lived in tbl_bill_items — the
+-- current model has no equivalent for these, and every current code path
+-- writes exclusively through tbl_bill_items, so a bill row from any
+-- current-generation deploy never populates them. Only auto-drop them when
+-- tbl_bills is empty; if real bills exist in this older shape, leave them
+-- in place and surface a NOTICE rather than guess at destroying data.
+
+DO $$
+DECLARE
+	existing_bill_count bigint;
+BEGIN
+	IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tbl_bills' AND column_name = 'product_id') THEN
+		EXECUTE 'SELECT count(*) FROM tbl_bills' INTO existing_bill_count;
+		IF existing_bill_count = 0 THEN
+			ALTER TABLE tbl_bills DROP COLUMN IF EXISTS product_id;
+			ALTER TABLE tbl_bills DROP COLUMN IF EXISTS kilogram;
+			ALTER TABLE tbl_bills DROP COLUMN IF EXISTS price;
+		ELSE
+			RAISE NOTICE 'tbl_bills has % row(s) and still carries legacy product_id/kilogram/price columns from a pre-bill_items schema — NOT dropped automatically. Back up and inspect before removing them by hand.', existing_bill_count;
+		END IF;
+	END IF;
+END $$;
+
+ALTER TABLE tbl_bills ADD COLUMN IF NOT EXISTS customer_phone varchar(50);
 
 -- 4) bills: money to numeric, defaults, type -------------------------------------------------
 
@@ -109,7 +144,26 @@ ALTER TABLE tbl_bills ALTER COLUMN slip DROP NOT NULL;
 -- 5) drop label from customer addresses/phones -----------------------------------------------
 
 ALTER TABLE tbl_customer_addresses DROP COLUMN IF EXISTS label;
+
+-- tbl_customer_phones may not exist yet on a deployment that predates it —
+-- create it (without label; AutoMigrate would otherwise be the one to do
+-- this, but doing it here keeps the constraint/index creation in one place).
+CREATE TABLE IF NOT EXISTS tbl_customer_phones (
+	id bigserial PRIMARY KEY,
+	created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	customer_id bigint NOT NULL REFERENCES tbl_customers (id) ON UPDATE CASCADE ON DELETE CASCADE,
+	phone varchar(50) NOT NULL,
+	is_default boolean NOT NULL DEFAULT false,
+	deleted_at timestamptz
+);
+
 ALTER TABLE tbl_customer_phones DROP COLUMN IF EXISTS label;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_customer_phones_one_default
+	ON tbl_customer_phones (customer_id) WHERE is_default = true AND deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_tbl_customer_phones_deleted_at ON tbl_customer_phones (deleted_at);
 
 -- 6) bill numbering: tbl_bill_sequences per (store_id, type) ----------------------------------
 -- Preserves the app's existing numbering rule (cap at 50 receipts per book,

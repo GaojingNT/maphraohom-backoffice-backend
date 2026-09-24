@@ -384,6 +384,13 @@ func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (mode
 		return bill, err
 	}
 
+	// Reload with Store + Items.Product preloaded to match the shape
+	// responses.BillDetailResponse.Make expects (storeName, each item's
+	// productName).
+	if err = r.db.Preload("Store").Preload("Items.Product").First(&bill, bill.ID).Error; err != nil {
+		return bill, err
+	}
+
 	return bill, nil
 }
 
