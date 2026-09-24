@@ -2,17 +2,18 @@ package bill_module
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"mime/multipart"
 	"time"
 
-	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
 	"maphraohom.app/maphraohom-backoffice/pkg/database/paginator"
+	"maphraohom.app/maphraohom-backoffice/pkg/imagevalidate"
 	"maphraohom.app/maphraohom-backoffice/src/models"
 	"maphraohom.app/maphraohom-backoffice/src/modules/bill_module/dtos"
 	"maphraohom.app/maphraohom-backoffice/src/modules/bill_module/responses"
@@ -21,17 +22,6 @@ import (
 // billSlipPath is the MinIO/local-storage folder bill slips are kept under,
 // partitioned by day so no single folder grows unbounded.
 const billSlipPath = "slip"
-
-// maxSlipFileSize is the 10MB cap on a slip upload.
-const maxSlipFileSize = 10 * 1024 * 1024
-
-// slipExtByMIME maps a magic-byte-detected MIME type to the file extension
-// its object key is stored under — only these three are accepted.
-var slipExtByMIME = map[string]string{
-	"image/jpeg": ".jpg",
-	"image/png":  ".png",
-	"image/webp": ".webp",
-}
 
 func (s Service) GetBills(ctx context.Context, paginate *paginator.Pagination) (*paginator.Pagination, error) {
 	ctx, childSpan := s.tracer.TraceStart(ctx, "GetBillsService", trace.WithAttributes(attribute.String("service", "GetBills")))
@@ -231,12 +221,15 @@ func (s Service) UploadSlip(ctx context.Context, id int, file *multipart.FileHea
 		return "", err
 	}
 
-	if file.Size > maxSlipFileSize {
+	if file.Size > imagevalidate.MaxFileSize {
 		return "", exception.ErrSlipFileTooLarge
 	}
 
-	ext, err := detectSlipExtension(file)
+	ext, err := imagevalidate.DetectExtension(file)
 	if err != nil {
+		if errors.Is(err, imagevalidate.ErrUnsupported) {
+			return "", exception.ErrUnsupportedSlipType
+		}
 		return "", err
 	}
 
@@ -289,30 +282,4 @@ func (s Service) DeleteSlip(ctx context.Context, id int) error {
 	}
 
 	return nil
-}
-
-// detectSlipExtension reads the file's magic bytes (never trusting the
-// client-supplied filename/Content-Type) and returns the extension to store
-// it under, or exception.ErrUnsupportedSlipType if it isn't jpeg/png/webp.
-func detectSlipExtension(file *multipart.FileHeader) (string, error) {
-	f, err := file.Open()
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	mtype, err := mimetype.DetectReader(f)
-	if err != nil {
-		return "", err
-	}
-
-	// mimetype.Is walks the detected type's parent chain (e.g. some jpeg
-	// variants), so match by string on the parents too.
-	for m := mtype; m != nil; m = m.Parent() {
-		if ext, ok := slipExtByMIME[m.String()]; ok {
-			return ext, nil
-		}
-	}
-
-	return "", exception.ErrUnsupportedSlipType
 }

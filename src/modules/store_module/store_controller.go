@@ -5,8 +5,10 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
+	"maphraohom.app/maphraohom-backoffice/internal/http_response"
 	"maphraohom.app/maphraohom-backoffice/pkg/database/paginator"
 	"maphraohom.app/maphraohom-backoffice/src/models"
+	"maphraohom.app/maphraohom-backoffice/src/modules/store_module/dtos"
 )
 
 // GetStores lists all existing stores
@@ -77,6 +79,184 @@ func (c Controller) GetStore(f *fiber.Ctx) error {
 
 	c.m.tracer.TraceEnd(span)
 	return f.Status(fiber.StatusOK).JSON(responseData)
+}
+
+// UpdateStore replaces a store's name, address, and phone
+//
+//	@Summary		Update store
+//	@Description	Replace a store's name, address, and phone. Logo/signature are uploaded through their own endpoints.
+//	@Tags			Store Module (Version 1)
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"store id"
+//	@Param			body	body		dtos.UpdateStore	true	"store"
+//	@Success		200		{object}	responses.StoreDetailResponse
+//	@Failure		404		{object}	exception.ErrorResponse
+//	@Failure		500		{object}	exception.ErrorResponse
+//	@Router			/api/v1/stores/{id} [put]
+func (c Controller) UpdateStore(f *fiber.Ctx) error {
+	id, _ := f.ParamsInt("id")
+	ctx, span := c.m.tracer.TraceStart(f.Context(), "UpdateStoreController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "UpdateStore"), attribute.Int("id", id)))
+
+	dto := new(dtos.UpdateStore)
+	if err := f.BodyParser(dto); err != nil {
+		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, err)
+	}
+
+	responseData, err := c.storeService().UpdateStore(ctx, id, dto)
+	if err != nil {
+		if err == exception.ErrRecordNotFound {
+			return exception.HttpErrorResponseMapping(f, fiber.StatusNotFound, exception.RecordNotFoundResponseError, err)
+		}
+		return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
+	}
+
+	c.m.tracer.TraceEnd(span)
+	return f.Status(fiber.StatusOK).JSON(responseData)
+}
+
+// UploadLogo attaches (or replaces) a store's logo
+//
+//	@Summary		Upload a store's logo
+//	@Description	Upload a logo image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing store. Replaces any existing logo.
+//	@Tags			Store Module (Version 1)
+//	@Accept			mpfd
+//	@Produce		json
+//	@Param			id		path		int		true	"store id"
+//	@Param			logo	formData	file	true	"logo image"
+//	@Success		200		{object}	object{logo=string}
+//	@Failure		400		{object}	exception.ErrorResponse
+//	@Failure		404		{object}	exception.ErrorResponse
+//	@Failure		500		{object}	exception.ErrorResponse
+//	@Router			/api/v1/stores/{id}/logo [put]
+func (c Controller) UploadLogo(f *fiber.Ctx) error {
+	id, _ := f.ParamsInt("id")
+	ctx, span := c.m.tracer.TraceStart(f.Context(), "UploadLogoController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "UploadLogo"), attribute.Int("id", id)))
+
+	file, err := f.FormFile("logo")
+	if err != nil {
+		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, exception.ErrInvalidRequestParameter, exception.ParameterError{
+			FailedField: "logo",
+			Tag:         "required",
+			Value:       "",
+		})
+	}
+
+	logoURL, err := c.storeService().UploadLogo(ctx, id, file)
+	if err != nil {
+		switch err {
+		case exception.ErrRecordNotFound:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusNotFound, exception.RecordNotFoundResponseError, err)
+		case exception.ErrUnsupportedImageType:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.UnsupportedImageTypeResponseError, err)
+		case exception.ErrImageFileTooLarge:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.ImageFileTooLargeResponseError, err)
+		default:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
+		}
+	}
+
+	c.m.tracer.TraceEnd(span)
+	return f.Status(fiber.StatusOK).JSON(fiber.Map{"logo": logoURL})
+}
+
+// DeleteLogo removes a store's logo
+//
+//	@Summary		Delete a store's logo
+//	@Description	Clear a store's logo and remove the underlying file (best-effort)
+//	@Tags			Store Module (Version 1)
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		int	true	"store id"
+//	@Success		200	{object}	http_response.OkResponse
+//	@Failure		404	{object}	exception.ErrorResponse
+//	@Failure		500	{object}	exception.ErrorResponse
+//	@Router			/api/v1/stores/{id}/logo [delete]
+func (c Controller) DeleteLogo(f *fiber.Ctx) error {
+	id, _ := f.ParamsInt("id")
+	ctx, span := c.m.tracer.TraceStart(f.Context(), "DeleteLogoController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "DeleteLogo"), attribute.Int("id", id)))
+
+	if err := c.storeService().DeleteLogo(ctx, id); err != nil {
+		if err == exception.ErrRecordNotFound {
+			return exception.HttpErrorResponseMapping(f, fiber.StatusNotFound, exception.RecordNotFoundResponseError, err)
+		}
+		return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
+	}
+
+	c.m.tracer.TraceEnd(span)
+	return http_response.HttpOkResponse(f, "OK", "Logo deleted successfully")
+}
+
+// UploadSignature attaches (or replaces) a store's signature
+//
+//	@Summary		Upload a store's signature
+//	@Description	Upload a signature image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing store. Replaces any existing signature.
+//	@Tags			Store Module (Version 1)
+//	@Accept			mpfd
+//	@Produce		json
+//	@Param			id			path		int		true	"store id"
+//	@Param			signature	formData	file	true	"signature image"
+//	@Success		200			{object}	object{signature=string}
+//	@Failure		400			{object}	exception.ErrorResponse
+//	@Failure		404			{object}	exception.ErrorResponse
+//	@Failure		500			{object}	exception.ErrorResponse
+//	@Router			/api/v1/stores/{id}/signature [put]
+func (c Controller) UploadSignature(f *fiber.Ctx) error {
+	id, _ := f.ParamsInt("id")
+	ctx, span := c.m.tracer.TraceStart(f.Context(), "UploadSignatureController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "UploadSignature"), attribute.Int("id", id)))
+
+	file, err := f.FormFile("signature")
+	if err != nil {
+		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, exception.ErrInvalidRequestParameter, exception.ParameterError{
+			FailedField: "signature",
+			Tag:         "required",
+			Value:       "",
+		})
+	}
+
+	signatureURL, err := c.storeService().UploadSignature(ctx, id, file)
+	if err != nil {
+		switch err {
+		case exception.ErrRecordNotFound:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusNotFound, exception.RecordNotFoundResponseError, err)
+		case exception.ErrUnsupportedImageType:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.UnsupportedImageTypeResponseError, err)
+		case exception.ErrImageFileTooLarge:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.ImageFileTooLargeResponseError, err)
+		default:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
+		}
+	}
+
+	c.m.tracer.TraceEnd(span)
+	return f.Status(fiber.StatusOK).JSON(fiber.Map{"signature": signatureURL})
+}
+
+// DeleteSignature removes a store's signature
+//
+//	@Summary		Delete a store's signature
+//	@Description	Clear a store's signature and remove the underlying file (best-effort)
+//	@Tags			Store Module (Version 1)
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		int	true	"store id"
+//	@Success		200	{object}	http_response.OkResponse
+//	@Failure		404	{object}	exception.ErrorResponse
+//	@Failure		500	{object}	exception.ErrorResponse
+//	@Router			/api/v1/stores/{id}/signature [delete]
+func (c Controller) DeleteSignature(f *fiber.Ctx) error {
+	id, _ := f.ParamsInt("id")
+	ctx, span := c.m.tracer.TraceStart(f.Context(), "DeleteSignatureController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "DeleteSignature"), attribute.Int("id", id)))
+
+	if err := c.storeService().DeleteSignature(ctx, id); err != nil {
+		if err == exception.ErrRecordNotFound {
+			return exception.HttpErrorResponseMapping(f, fiber.StatusNotFound, exception.RecordNotFoundResponseError, err)
+		}
+		return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
+	}
+
+	c.m.tracer.TraceEnd(span)
+	return http_response.HttpOkResponse(f, "OK", "Signature deleted successfully")
 }
 
 // GetLastPrices lists, per product, the price last used at this store for a
