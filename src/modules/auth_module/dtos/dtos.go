@@ -17,4 +17,12 @@ type (
 	EncryptPasswordDto struct {
 		Password string `json:"password" form:"password" query:"password" validate:"required,min=8"`
 	}
+	// UpdateProfileDto is the JSON body of PUT /api/v1/auth/profile. The
+	// signature is uploaded through its own endpoint
+	// (PUT /api/v1/auth/profile/signature).
+	UpdateProfileDto struct {
+		FirstName string `json:"firstName" form:"firstName" validate:"max=100"`
+		LastName  string `json:"lastName" form:"lastName" validate:"max=100"`
+		Email     string `json:"email" form:"email" validate:"required,max=100,email"`
+	}
 )

@@ -37,7 +37,7 @@ type (
 
 	// BillDetailResponse is the shape returned by GET /bills/:id — every
 	// bills table column except deleted_at, plus the issuing store's
-	// printable profile (name/logo/address/phone/signature), a ready-to-use
+	// printable profile (name/logo/address/phone), a ready-to-use
 	// slip URL, and its line items (with each item's product name).
 	BillDetailResponse struct {
 		ID              int              `json:"id"`
@@ -47,7 +47,6 @@ type (
 		StoreLogo       string           `json:"storeLogo"`
 		StoreAddress    string           `json:"storeAddress"`
 		StorePhone      string           `json:"storePhone"`
-		StoreSignature  string           `json:"storeSignature"`
 		CustomerID      *int             `json:"customerId,omitempty"`
 		BookNo          int              `json:"bookNo"`
 		ReceiptNo       int              `json:"receiptNo"`
@@ -118,16 +117,13 @@ func (response *BillDetailResponse) Make(bill models.Bill) *BillDetailResponse {
 		})
 	}
 
-	var storeName, storeLogo, storeAddress, storePhone, storeSignature string
+	var storeName, storeLogo, storeAddress, storePhone string
 	if bill.Store != nil {
 		storeName = bill.Store.Name
 		storeAddress = bill.Store.Address
 		storePhone = bill.Store.Phone
 		if bill.Store.Logo != "" {
 			storeLogo = SlipURLBuilder(bill.Store.Logo)
-		}
-		if bill.Store.Signature != "" {
-			storeSignature = SlipURLBuilder(bill.Store.Signature)
 		}
 	}
 
@@ -145,7 +141,6 @@ func (response *BillDetailResponse) Make(bill models.Bill) *BillDetailResponse {
 		StoreLogo:       storeLogo,
 		StoreAddress:    storeAddress,
 		StorePhone:      storePhone,
-		StoreSignature:  storeSignature,
 		CustomerID:      bill.CustomerID,
 		BookNo:          bill.BookNo,
 		ReceiptNo:       bill.ReceiptNo,

@@ -7,7 +7,7 @@ import (
 	"maphraohom.app/maphraohom-backoffice/src/models"
 )
 
-// FileURLBuilder turns a stored object key (logo/signature) into a URL the
+// FileURLBuilder turns a stored object key (logo) into a URL the
 // client can load directly — the same GET /api/v1/files/* proxy the bill
 // module's slip URL uses.
 var FileURLBuilder = func(key string) string {
@@ -24,16 +24,25 @@ type (
 
 	// StoreDetailResponse is the shape returned by GET /stores/:id and
 	// PUT /stores/:id — every stores table column except deleted_at, with
-	// logo/signature resolved to ready-to-use URLs (empty string when unset).
+	// the logo resolved to a ready-to-use URL (empty string when unset), plus
+	// the store's owners.
 	StoreDetailResponse struct {
+		ID        int                  `json:"id"`
+		Name      string               `json:"name"`
+		Logo      string               `json:"logo"`
+		Address   string               `json:"address"`
+		Phone     string               `json:"phone"`
+		Owners    []StoreOwnerResponse `json:"owners"`
+		CreatedAt string               `json:"createdAt"`
+		UpdatedAt string               `json:"updatedAt"`
+	}
+
+	// StoreOwnerResponse is one of a store's owners (tbl_user_stores).
+	StoreOwnerResponse struct {
 		ID        int    `json:"id"`
-		Name      string `json:"name"`
-		Logo      string `json:"logo"`
-		Signature string `json:"signature"`
-		Address   string `json:"address"`
-		Phone     string `json:"phone"`
-		CreatedAt string `json:"createdAt"`
-		UpdatedAt string `json:"updatedAt"`
+		Email     string `json:"email"`
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
 	}
 
 	// LastPriceItem is one product's last price used at a store for a given
@@ -68,13 +77,23 @@ func (StoreListItem) Collection(stores []models.Store) []StoreListItem {
 }
 
 func (response *StoreDetailResponse) Make(store models.Store) *StoreDetailResponse {
+	owners := make([]StoreOwnerResponse, 0, len(store.Owners))
+	for _, owner := range store.Owners {
+		owners = append(owners, StoreOwnerResponse{
+			ID:        owner.ID,
+			Email:     owner.Email,
+			FirstName: owner.FirstName,
+			LastName:  owner.LastName,
+		})
+	}
+
 	return &StoreDetailResponse{
 		ID:        store.ID,
 		Name:      store.Name,
 		Logo:      resolveKey(store.Logo),
-		Signature: resolveKey(store.Signature),
 		Address:   store.Address,
 		Phone:     store.Phone,
+		Owners:    owners,
 		CreatedAt: store.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt: store.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}

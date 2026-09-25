@@ -22,7 +22,9 @@ services:
       - maphraohom-network
     ports:
       - "8000:8000"
-      - "8001:8001"
+      # gRPC (UserService) has no authentication — reachable only from the
+      # VM itself, never from outside.
+      - "127.0.0.1:8001:8001"
     depends_on:
       - redis
       - postgres_db

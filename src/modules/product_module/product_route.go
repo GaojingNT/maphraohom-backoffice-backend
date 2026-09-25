@@ -9,6 +9,6 @@ import (
 func (m module) Routes(route fiber.Router, middleware *middlewares.Middleware) {
 	// Version 1
 	v1 := route.Group("v1")
-	product := v1.Group("products")
+	product := v1.Group("products", middleware.JwtAuthProtected())
 	product.Get("", func(c *fiber.Ctx) error { return m.Controller().GetProducts(c) })
 }

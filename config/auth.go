@@ -23,8 +23,10 @@ func NewAuthConfig() *authConfig {
 		KeycloakConfig: NewKeycloakConfig(),
 		SecretKey:      os.Getenv("AUTH_SECRET_KEY"),
 		SessionLifetime: func() int {
-			// default 3600 seconds
-			sessionLifeTime := 3600
+			// default 30 days — the login cookie lives exactly as long as the
+			// JWT, and a fixed (non-sliding) expiry means everyone signs in
+			// again at most every 30 days.
+			sessionLifeTime := 30 * 24 * 60 * 60
 			envSessionLifeTime, err := strconv.Atoi(os.Getenv("AUTH_SESSION_LIFETIME"))
 			if err == nil {
 				sessionLifeTime = envSessionLifeTime

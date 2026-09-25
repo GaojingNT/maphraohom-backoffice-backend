@@ -18,9 +18,18 @@ type User struct {
 	ResetPasswordToken     string        `json:"-" gorm:"column:reset_password_token;type:text;"`
 	ResetPasswordExpiredAt *sql.NullTime `json:"-" gorm:"column:reset_password_expired_at;type:timestamp;"`
 
+	// Signature is a MinIO object key only — never a full URL. It's printed
+	// on every receipt this user exports (moved here from Store, so the
+	// signature belongs to the person issuing the document, not the shop).
+	Signature string `json:"signature" gorm:"column:signature;size:255;"`
+
 	// User has only one role
 	RoleID *int  `json:"roleId,omitempty" gorm:"column:role_id;null;"`
 	Role   *Role `json:"role,omitempty" gorm:"foreignKey:RoleID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+
+	// Stores this user owns — many-to-many through tbl_user_stores (a store
+	// can have several owners, and an owner several stores).
+	Stores []Store `json:"stores,omitempty" gorm:"many2many:user_stores;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 
 	// Soft delete
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"column:deleted_at;index;"`

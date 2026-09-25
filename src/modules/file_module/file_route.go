@@ -10,5 +10,5 @@ func (m module) Routes(route fiber.Router, middleware *middlewares.Middleware) {
 	// Version 1
 	v1 := route.Group("v1")
 	// Wildcard captures the full storage key, e.g. bills/slips/<uuid>.jpeg
-	v1.Get("files/*", func(c *fiber.Ctx) error { return m.Controller().GetFile(c) })
+	v1.Get("files/*", middleware.JwtAuthProtected(), func(c *fiber.Ctx) error { return m.Controller().GetFile(c) })
 }

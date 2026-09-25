@@ -38,8 +38,14 @@ func HTTPRootMiddleware(r *http_server.Route) {
 		fiberLoggerMiddleware.New(config.Global.Fiber.Middleware.Logger),
 		fiberFavicon.New(config.Global.Fiber.Middleware.Favicon),
 		fiberRecover.New(),
-		fiberPprof.New(), // pprof is registered at "/debug/pprof"
 	)
+
+	// pprof ("/debug/pprof") exposes server internals and can't sit behind
+	// JwtAuthProtected (it's a root middleware, so it answers before any
+	// route-level auth runs) — local/development only.
+	if !config.IsProduction {
+		r.Use(fiberPprof.New())
+	}
 }
 
 func HTTPRoutes(s *http_server.HttpServer) {
@@ -50,12 +56,12 @@ func HTTPRoutes(s *http_server.HttpServer) {
 	// REST API endpoints ------------------------------------------------------------------
 
 	s.Route().Get("/", func(c *fiber.Ctx) error { return c.Status(fiber.StatusOK).SendString(c.App().Config().AppName) })
-	s.Route().Get("/monitor", fiberMonitor.New(fiberMonitor.Config{Title: "App Monitoring"}))
+	s.Route().Get("/monitor", middleware.JwtAuthProtected(), fiberMonitor.New(fiberMonitor.Config{Title: "App Monitoring"}))
 	s.Route().Get("/swagger/*", swagger.HandlerDefault)
 
 	// Cache clear endpoint
 	// This endpoint is used to clear the Redis cache, useful for development or debugging purposes.
-	s.Route().Get("/cache/clear", func(c *fiber.Ctx) error {
+	s.Route().Get("/cache/clear", middleware.JwtAuthProtected(), func(c *fiber.Ctx) error {
 		if err := s.Cacher.Redis.FlushAll(c.Context()); err != nil {
 			return c.Status(fiber.StatusInternalServerError).SendString(fmt.Sprintf("ClearCacheFailedError: %+v\n", err))
 		}

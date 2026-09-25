@@ -65,7 +65,7 @@ func (r Repository) GetStoreByID(ctx context.Context, id int) (models.Store, err
 
 	utils.Block{
 		Try: func() {
-			if err = r.db.First(&store, id).Error; err != nil {
+			if err = r.db.Preload("Owners").First(&store, id).Error; err != nil {
 				utils.Throw(err)
 			}
 		},
@@ -93,8 +93,8 @@ func (r Repository) GetStoreByID(ctx context.Context, id int) (models.Store, err
 }
 
 // UpdateStoreInput is the editable, non-image subset of a store — name,
-// address, phone. Logo/Signature are only ever changed through their own
-// upload/delete methods below.
+// address, phone. The logo is only ever changed through its own upload/delete
+// methods below.
 type UpdateStoreInput struct {
 	Name    string
 	Address string
@@ -119,6 +119,12 @@ func (r Repository) UpdateStore(ctx context.Context, id int, input UpdateStoreIn
 			store.Phone = input.Phone
 
 			if err = r.db.Save(&store).Error; err != nil {
+				utils.Throw(err)
+			}
+
+			// Reload with owners for the response — loaded only after Save
+			// so Save never touches the ownership rows.
+			if err = r.db.Preload("Owners").First(&store, id).Error; err != nil {
 				utils.Throw(err)
 			}
 		},
@@ -146,9 +152,8 @@ func (r Repository) UpdateStore(ctx context.Context, id int, input UpdateStoreIn
 }
 
 // getStoreImageKey and updateStoreImage back GetStoreLogoKey/UpdateStoreLogo
-// and GetStoreSignatureKey/UpdateStoreSignature below — logo and signature
-// are both plain object-key columns on tbl_stores, so the read/write logic
-// only differs by column name.
+// below — kept column-generic so another image column on tbl_stores only
+// needs a pair of one-line wrappers.
 func (r Repository) getStoreImageKey(ctx context.Context, id int, column string, spanName string) (string, error) {
 	var (
 		_, childSpan = r.tracer.TraceStart(ctx, spanName, trace.WithAttributes(attribute.String("repository", spanName), attribute.Int64("id", int64(id))))
@@ -182,9 +187,6 @@ func (r Repository) getStoreImageKey(ctx context.Context, id int, column string,
 		return "", err
 	}
 
-	if column == "signature" {
-		return store.Signature, nil
-	}
 	return store.Logo, nil
 }
 
@@ -221,14 +223,6 @@ func (r Repository) GetStoreLogoKey(ctx context.Context, id int) (string, error)
 
 func (r Repository) UpdateStoreLogo(ctx context.Context, id int, key string) error {
 	return r.updateStoreImage(ctx, id, "logo", key, "UpdateStoreLogoRepository")
-}
-
-func (r Repository) GetStoreSignatureKey(ctx context.Context, id int) (string, error) {
-	return r.getStoreImageKey(ctx, id, "signature", "GetStoreSignatureKeyRepository")
-}
-
-func (r Repository) UpdateStoreSignature(ctx context.Context, id int, key string) error {
-	return r.updateStoreImage(ctx, id, "signature", key, "UpdateStoreSignatureRepository")
 }
 
 // lastPriceRow is the scan target for GetLastPrices' DISTINCT ON query.

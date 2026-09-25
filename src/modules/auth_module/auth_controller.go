@@ -49,7 +49,10 @@ func (c Controller) SignIn(f *fiber.Ctx) error {
 	// Call service function
 	accessToken, err = c.authService().Authenticate(ctx, dto)
 	if err != nil {
-		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, err)
+		if err == exception.ErrInvalidLoginCredential {
+			return exception.HttpErrorResponseMapping(f, fiber.StatusUnauthorized, exception.InvalidLoginCredentialResponseError, err)
+		}
+		return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.ErrorResponseInternalServerError, err)
 	}
 
 	c.m.tracer.TraceEnd(span)
