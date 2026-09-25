@@ -7,6 +7,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
+	"maphraohom.app/maphraohom-backoffice/internal/encryption"
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
 	"maphraohom.app/maphraohom-backoffice/internal/utils"
 	"maphraohom.app/maphraohom-backoffice/src/models"
@@ -129,6 +130,53 @@ func (r Repository) UpdateUserSignature(ctx context.Context, id int, key string)
 		},
 		Catch: func(e utils.Exception) {
 			err = e.(error)
+			r.logger.Error(err.Error())
+			sentry.CaptureException(err)
+			exception.SqlErrorMessage = err.Error()
+			err = exception.ErrDbQueryStatement
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	return err
+}
+
+// ChangePassword verifies currentPassword against the stored hash, then
+// replaces it with newPassword's hash. Returns
+// exception.ErrCurrentPasswordIncorrect when the current password is wrong.
+func (r Repository) ChangePassword(ctx context.Context, id int, currentPassword string, newPassword string) error {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "ChangePasswordRepository", trace.WithAttributes(attribute.String("repository", "ChangePassword"), attribute.Int64("id", int64(id))))
+		user         models.User
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Select("id", "password").First(&user, id).Error; err != nil {
+				utils.Throw(err)
+			}
+
+			if !encryption.VerifyPassword(currentPassword, user.Password) {
+				err = exception.ErrCurrentPasswordIncorrect
+				utils.Throw(err)
+			}
+
+			if err = r.db.Model(&models.User{}).Where("id = ?", id).Update("password", encryption.EncryptPassword(newPassword, "")).Error; err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			err = e.(error)
+			switch err {
+			case exception.ErrCurrentPasswordIncorrect:
+				return
+			case gorm.ErrRecordNotFound:
+				err = exception.ErrRecordNotFound
+				return
+			}
 			r.logger.Error(err.Error())
 			sentry.CaptureException(err)
 			exception.SqlErrorMessage = err.Error()

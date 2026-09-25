@@ -31,6 +31,8 @@ var (
 	ErrInvalidLoginCredential    = eris.New("invalid login credential")
 	ErrInvalidResetPasswordToken = eris.New("invalid reset password token")
 	ErrEmailAlreadyTaken         = eris.New("email is already used by another user")
+	ErrCurrentPasswordIncorrect  = eris.New("current password is incorrect")
+	ErrPasswordConfirmMismatch   = eris.New("new password and confirmation do not match")
 	// token errors
 	ErrInvalidToken            = eris.New("invalid token")
 	ErrInvalidRequestParameter = eris.New("invalid request parameter")
@@ -60,6 +62,8 @@ var (
 	InvalidLoginCredentialResponseError    = &ErrorResponse{Code: "A-3001", Message: "invalid login credential"}
 	InvalidResetPasswordTokenResponseError = &ErrorResponse{Code: "A-3002", Message: "invalid reset password token"}
 	EmailAlreadyTakenResponseError         = &ErrorResponse{Code: "A-3003", Message: "email is already used by another user"}
+	CurrentPasswordIncorrectResponseError  = &ErrorResponse{Code: "A-3004", Message: "current password is incorrect"}
+	PasswordConfirmMismatchResponseError   = &ErrorResponse{Code: "A-3005", Message: "new password and confirmation do not match"}
 	// token error response messages
 	UnauthorizedResponseError            = &ErrorResponse{Code: "T-1001", Message: "unauthorized"}
 	ForbiddenResponseError               = &ErrorResponse{Code: "T-1002", Message: "forbidden"}
