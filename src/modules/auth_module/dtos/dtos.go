@@ -25,4 +25,10 @@ type (
 		LastName  string `json:"lastName" form:"lastName" validate:"max=100"`
 		Email     string `json:"email" form:"email" validate:"required,max=100,email"`
 	}
+	// ChangePasswordDto is the JSON body of PUT /api/v1/auth/profile/password.
+	ChangePasswordDto struct {
+		CurrentPassword string `json:"currentPassword" form:"currentPassword" validate:"required"`
+		NewPassword     string `json:"newPassword" form:"newPassword" validate:"required,min=8,max=100"`
+		ConfirmPassword string `json:"confirmPassword" form:"confirmPassword" validate:"required"`
+	}
 )

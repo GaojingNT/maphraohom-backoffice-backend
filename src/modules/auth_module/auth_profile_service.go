@@ -115,3 +115,17 @@ func (s Service) DeleteSignature(ctx context.Context, id int) error {
 
 	return nil
 }
+
+// ChangePassword replaces the signed-in user's password after checking the
+// current one. Existing sessions (JWTs) stay valid until they expire —
+// they're stateless and not tied to the password.
+func (s Service) ChangePassword(ctx context.Context, id int, dto *dtos.ChangePasswordDto) error {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "ChangePasswordService", trace.WithAttributes(attribute.String("service", "ChangePassword"), attribute.Int("id", id)))
+	defer s.tracer.TraceEnd(childSpan)
+
+	if dto.NewPassword != dto.ConfirmPassword {
+		return exception.ErrPasswordConfirmMismatch
+	}
+
+	return s.authRepository().ChangePassword(ctx, id, dto.CurrentPassword, dto.NewPassword)
+}

@@ -126,3 +126,49 @@ func (c Controller) DeleteSignature(f *fiber.Ctx) error {
 	c.m.tracer.TraceEnd(span)
 	return http_response.HttpOkResponse(f, "OK", "Signature deleted successfully")
 }
+
+// ChangePassword changes the signed-in user's own password
+//
+//	@Summary		Change my password
+//	@Description	Replace the signed-in user's password. The current password must be given and correct; newPassword must be 8+ characters and match confirmPassword.
+//	@Tags			Auth Module (Version 1)
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		dtos.ChangePasswordDto	true	"passwords"
+//	@Success		200		{object}	http_response.OkResponse
+//	@Failure		400		{object}	exception.ErrorResponse
+//	@Failure		401		{object}	exception.ErrorResponse
+//	@Failure		500		{object}	exception.ErrorResponse
+//	@Router			/api/v1/auth/profile/password [put]
+func (c Controller) ChangePassword(f *fiber.Ctx) error {
+	ctx, span := c.m.tracer.TraceStart(f.Context(), "ChangePasswordController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "ChangePassword")))
+
+	user := f.Locals("authUser").(*models.User)
+
+	dto := new(dtos.ChangePasswordDto)
+	if err := f.BodyParser(dto); err != nil {
+		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, err)
+	}
+
+	if errors := validator.Validate(*dto); errors != nil {
+		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, exception.ErrInvalidRequestParameter, errors...)
+	}
+
+	if err := c.authService().ChangePassword(ctx, user.ID, dto); err != nil {
+		switch err {
+		case exception.ErrPasswordConfirmMismatch:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.PasswordConfirmMismatchResponseError, err)
+		// 400, not 401: the session is fine — only the typed password is
+		// wrong, and a 401 would sign the user out on the frontend.
+		case exception.ErrCurrentPasswordIncorrect:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.CurrentPasswordIncorrectResponseError, err)
+		case exception.ErrRecordNotFound:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusUnauthorized, exception.UnauthorizedResponseError, exception.ErrUnauthorized)
+		default:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
+		}
+	}
+
+	c.m.tracer.TraceEnd(span)
+	return http_response.HttpOkResponse(f, "OK", "Password changed successfully")
+}
