@@ -9,7 +9,7 @@ import (
 func (m module) Routes(route fiber.Router, middleware *middlewares.Middleware) {
 	// Version 1
 	v1 := route.Group("v1")
-	customer := v1.Group("customers")
+	customer := v1.Group("customers", middleware.JwtAuthProtected())
 	customer.Get("", func(c *fiber.Ctx) error { return m.Controller().GetCustomers(c) })
 	customer.Get(":id", func(c *fiber.Ctx) error { return m.Controller().GetCustomer(c) })
 	customer.Get(":id/addresses", func(c *fiber.Ctx) error { return m.Controller().GetCustomerAddresses(c) })

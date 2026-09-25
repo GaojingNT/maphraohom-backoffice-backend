@@ -117,6 +117,15 @@ func Initialize() *gorm.DB {
 func AutoMigrate(dbConn *gorm.DB) {
 	log.Println("[App] Auto migrating the schema...")
 
+	// User <-> Store ownership uses an explicit join model (composite PK +
+	// store_id index) — register it before AutoMigrate creates the table.
+	if err := dbConn.SetupJoinTable(&models.User{}, "Stores", &models.UserStore{}); err != nil {
+		log.Fatal(err)
+	}
+	if err := dbConn.SetupJoinTable(&models.Store{}, "Owners", &models.UserStore{}); err != nil {
+		log.Fatal(err)
+	}
+
 	// Auto migrate the schema by GORM
 	if err := dbConn.AutoMigrate(
 		// Add your models here...

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"net/mail"
@@ -89,9 +90,12 @@ func (r Repository) Authenticate(ctx context.Context, username string, password 
 		},
 		Catch: func(e utils.Exception) {
 			err = e.(error)
-			if err == gorm.ErrRecordNotFound { // CASE: User not found
-				err = exception.ErrRecordNotFound
-			} else {
+			switch {
+			// Unknown email and wrong password answer the same, so the
+			// sign-in form can't be used to probe which emails exist.
+			case errors.Is(err, exception.ErrRecordNotFound), errors.Is(err, gorm.ErrRecordNotFound), errors.Is(err, exception.ErrInvalidLoginCredential):
+				err = exception.ErrInvalidLoginCredential
+			default:
 				// Logging
 				r.logger.Error(err.Error())
 				sentry.CaptureException(err)
@@ -124,6 +128,7 @@ func (r Repository) GetUserByID(ctx context.Context, id int) (*models.User, erro
 				Preload("Role.RoleGroups").
 				Preload("Role.Permissions").
 				Preload("Role.Menus.SubMenus").
+				Preload("Stores", func(db *gorm.DB) *gorm.DB { return db.Order("tbl_stores.id") }).
 				First(&user, id).Error; err != nil {
 				utils.Throw(err)
 			}

@@ -1,6 +1,7 @@
 package responses
 
 import (
+	"fmt"
 	"time"
 
 	"maphraohom.app/maphraohom-backoffice/src/models"
@@ -13,8 +14,13 @@ type (
 		FirstName string `json:"firstName"`
 		LastName  string `json:"lastName"`
 
+		// Ready-to-use URL of the user's signature image — printed on every
+		// receipt they export. Empty string when unset.
+		Signature string `json:"signature"`
+
 		// Relations
-		Role *GetProfileRoleResponse `json:"role"`
+		Role   *GetProfileRoleResponse   `json:"role"`
+		Stores []GetProfileStoreResponse `json:"stores"`
 
 		// Timestamp & Audit fields
 		CreatedAt time.Time `json:"createdAt"`
@@ -55,6 +61,12 @@ type (
 	GetProfileRolePermissionResponse struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
+	}
+	// Stores the user owns (tbl_user_stores)
+	GetProfileStoreResponse struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+		Logo string `json:"logo"`
 	}
 )
 
@@ -143,17 +155,44 @@ func (response *GetProfileResponse) Make(user *models.User) *GetProfileResponse 
 		responseRole = nil
 	}
 
+	stores := make([]GetProfileStoreResponse, 0, len(user.Stores))
+	for _, store := range user.Stores {
+		stores = append(stores, GetProfileStoreResponse{
+			ID:   store.ID,
+			Name: store.Name,
+			Logo: resolveKey(store.Logo),
+		})
+	}
+
 	response = &GetProfileResponse{
 		ID:        user.ID,
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 		Email:     user.Email,
+		Signature: resolveKey(user.Signature),
 		// Relations
-		Role: responseRole,
+		Role:   responseRole,
+		Stores: stores,
 		// Timestamp & Audit fields
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 	}
 
 	return response
+}
+
+// FileURLBuilder turns a stored object key (signature, store logo) into a URL
+// the client can load directly — the same GET /api/v1/files/* proxy the
+// store and bill modules use.
+var FileURLBuilder = func(key string) string {
+	return fmt.Sprintf("/api/v1/files/%s", key)
+}
+
+// resolveKey turns a stored object key into a ready-to-use URL, leaving an
+// unset key as "" rather than a broken "/api/v1/files/" link.
+func resolveKey(key string) string {
+	if key == "" {
+		return ""
+	}
+	return FileURLBuilder(key)
 }

@@ -13,6 +13,9 @@ func (m module) Routes(route fiber.Router, middleware *middlewares.Middleware) {
 	auth.Post("/sign-in", func(c *fiber.Ctx) error { return m.Controller().SignIn(c) })
 	auth.Post("/forgot-password", func(c *fiber.Ctx) error { return m.Controller().ForgotPassword(c) })
 	auth.Post("/reset-password", func(c *fiber.Ctx) error { return m.Controller().ResetPassword(c) })
-	auth.Post("/encrypt-password", func(c *fiber.Ctx) error { return m.Controller().EncryptPassword(c) })
+	auth.Post("/encrypt-password", middleware.JwtAuthProtected(), func(c *fiber.Ctx) error { return m.Controller().EncryptPassword(c) })
 	auth.Get("/profile", middleware.JwtAuthProtected(), func(c *fiber.Ctx) error { return m.Controller().GetProfile(c) })
+	auth.Put("/profile", middleware.JwtAuthProtected(), func(c *fiber.Ctx) error { return m.Controller().UpdateProfile(c) })
+	auth.Put("/profile/signature", middleware.JwtAuthProtected(), func(c *fiber.Ctx) error { return m.Controller().UploadSignature(c) })
+	auth.Delete("/profile/signature", middleware.JwtAuthProtected(), func(c *fiber.Ctx) error { return m.Controller().DeleteSignature(c) })
 }

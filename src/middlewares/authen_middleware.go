@@ -51,6 +51,20 @@ func (m *Middleware) JwtAuthProtected() func(*fiber.Ctx) error {
 						user.Role.Name = role["name"].(string)
 					}
 
+					// Sessions last up to AUTH_SESSION_LIFETIME (30 days by
+					// default), so a valid signature isn't enough — the user
+					// must still exist (soft-deleted users are excluded by
+					// GORM's default scope), or deleting a user wouldn't lock
+					// them out until their token expired.
+					var exists int64
+					if err := m.db.Model(&models.User{}).Where("id = ?", user.ID).Count(&exists).Error; err != nil {
+						exception.SqlErrorMessage = err.Error()
+						return exception.HttpErrorResponseMapping(c, fiber.StatusInternalServerError, exception.DbQueryStatementResponseError, err)
+					}
+					if exists == 0 {
+						return exception.HttpErrorResponseMapping(c, fiber.StatusUnauthorized, exception.UnauthorizedResponseError, exception.ErrUnauthorized)
+					}
+
 					// Set auth user to context
 					c.Locals("authUser", user)
 				} else {

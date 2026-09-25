@@ -18,8 +18,8 @@ import (
 	"maphraohom.app/maphraohom-backoffice/src/modules/store_module/responses"
 )
 
-// storeImagePath is the MinIO/local-storage folder store logo/signature
-// images are kept under, partitioned by kind ("logo" or "signature") and
+// storeImagePath is the MinIO/local-storage folder store logo images are
+// kept under, partitioned by kind ("logo") and
 // day so no single folder grows unbounded.
 const storeImagePath = "store"
 
@@ -51,8 +51,8 @@ func (s Service) GetStore(ctx context.Context, id int) (*responses.StoreDetailRe
 	return new(responses.StoreDetailResponse).Make(store), nil
 }
 
-// UpdateStore replaces a store's name, address, and phone. Logo/Signature
-// are untouched here — see UploadLogo/UploadSignature.
+// UpdateStore replaces a store's name, address, and phone. The logo is
+// untouched here — see UploadLogo.
 func (s Service) UpdateStore(ctx context.Context, id int, dto *dtos.UpdateStore) (*responses.StoreDetailResponse, error) {
 	ctx, childSpan := s.tracer.TraceStart(ctx, "UpdateStoreService", trace.WithAttributes(attribute.String("service", "UpdateStore")))
 	defer s.tracer.TraceEnd(childSpan)
@@ -70,7 +70,7 @@ func (s Service) UpdateStore(ctx context.Context, id int, dto *dtos.UpdateStore)
 }
 
 // uploadStoreImage validates (magic bytes + size), uploads, and attaches a
-// logo/signature image to an existing store. kind is "logo" or "signature" —
+// logo image to an existing store. kind is "logo" —
 // it names the storage sub-folder and picks which repository getter/setter
 // to call. On a DB failure after a successful upload, the newly uploaded
 // object is removed. On success, any previous image object is removed
@@ -118,7 +118,7 @@ func (s Service) uploadStoreImage(ctx context.Context, id int, file *multipart.F
 	return responses.FileURLBuilder(key), nil
 }
 
-// deleteStoreImage clears a store's logo/signature, then best-effort removes
+// deleteStoreImage clears a store's logo, then best-effort removes
 // the underlying object. A store with no image set is left as-is (idempotent).
 func (s Service) deleteStoreImage(ctx context.Context, id int, kind string, getKey func(context.Context, int) (string, error), setKey func(context.Context, int, string) error) error {
 	oldKey, err := getKey(ctx, id)
@@ -155,22 +155,6 @@ func (s Service) DeleteLogo(ctx context.Context, id int) error {
 
 	repo := s.storeRepository()
 	return s.deleteStoreImage(ctx, id, "logo", repo.GetStoreLogoKey, repo.UpdateStoreLogo)
-}
-
-func (s Service) UploadSignature(ctx context.Context, id int, file *multipart.FileHeader) (string, error) {
-	ctx, childSpan := s.tracer.TraceStart(ctx, "UploadSignatureService", trace.WithAttributes(attribute.String("service", "UploadSignature"), attribute.Int("id", id)))
-	defer s.tracer.TraceEnd(childSpan)
-
-	repo := s.storeRepository()
-	return s.uploadStoreImage(ctx, id, file, "signature", repo.GetStoreSignatureKey, repo.UpdateStoreSignature)
-}
-
-func (s Service) DeleteSignature(ctx context.Context, id int) error {
-	ctx, childSpan := s.tracer.TraceStart(ctx, "DeleteSignatureService", trace.WithAttributes(attribute.String("service", "DeleteSignature"), attribute.Int("id", id)))
-	defer s.tracer.TraceEnd(childSpan)
-
-	repo := s.storeRepository()
-	return s.deleteStoreImage(ctx, id, "signature", repo.GetStoreSignatureKey, repo.UpdateStoreSignature)
 }
 
 // GetLastPrices returns, for every product, the price used in this store's
