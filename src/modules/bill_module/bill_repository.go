@@ -47,6 +47,8 @@ type CreateBillInput struct {
 	// database column's own default). Never affects book/receipt numbering,
 	// which is scoped by the real server clock's calendar year regardless.
 	CreatedAt *time.Time
+	// CreatedBy is the id of the logged-in user issuing the bill.
+	CreatedBy *int
 }
 
 // UpdateBillInput carries the already-validated fields for replacing a
@@ -155,7 +157,7 @@ func (r Repository) GetBillByID(ctx context.Context, id int) (models.Bill, error
 	utils.Block{
 		Try: func() {
 			// Execute query
-			if err = r.db.Preload("Store").Preload("Items.Product").First(&bill, id).Error; err != nil {
+			if err = preloadBillDetail(r.db).First(&bill, id).Error; err != nil {
 				utils.Throw(err)
 			}
 		},
@@ -300,6 +302,74 @@ func nextBillNumbers(tx *gorm.DB, storeID int, billType string) (bookNo int, rec
 	return bookNo, receiptNo, nil
 }
 
+// preloadBillDetail loads everything responses.BillDetailResponse.Make
+// reads: the store, each item's product, and the creator's name — only
+// id/first_name/last_name, so email, password hash and signature never
+// leave the users table.
+func preloadBillDetail(db *gorm.DB) *gorm.DB {
+	return db.
+		Preload("Store").
+		Preload("Items.Product").
+		Preload("Creator", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id", "first_name", "last_name")
+		})
+}
+
+// newBill builds the row CreateBill inserts. EditedAt and SlipUploadedAt
+// start nil: a new bill has never been edited and has no slip yet.
+func newBill(input CreateBillInput, bookNo int, receiptNo int, customerID int) models.Bill {
+	bill := models.Bill{
+		StoreID:         input.StoreID,
+		Type:            input.Type,
+		CustomerID:      &customerID,
+		BookNo:          bookNo,
+		ReceiptNo:       receiptNo,
+		CustomerName:    input.CustomerName,
+		CustomerAddress: input.CustomerAddress,
+		CustomerPhone:   input.CustomerPhone,
+		Discount:        input.Discount,
+		ShippingFee:     input.ShippingFee,
+		Total:           input.Total,
+		Slip:            nil,
+		CreatedBy:       input.CreatedBy,
+	}
+	// A caller-supplied CreatedAt back-/post-dates the bill — GORM only
+	// auto-fills CreatedAt when it's still the zero value, so setting it
+	// here before Create is enough to override the column's
+	// CURRENT_TIMESTAMP default.
+	if input.CreatedAt != nil {
+		bill.CreatedAt = *input.CreatedAt
+	}
+	return bill
+}
+
+// applyBillUpdate copies an edit onto the loaded bill and stamps EditedAt.
+// Slip and SlipUploadedAt are left as loaded — an edit is not a slip change.
+func applyBillUpdate(bill *models.Bill, input UpdateBillInput, customerID int, now time.Time) {
+	bill.CustomerID = &customerID
+	bill.CustomerName = input.CustomerName
+	bill.CustomerAddress = input.CustomerAddress
+	bill.CustomerPhone = input.CustomerPhone
+	bill.Discount = input.Discount
+	bill.ShippingFee = input.ShippingFee
+	bill.Total = input.Total
+	bill.EditedAt = &now
+}
+
+// setBillSlip sets (key non-nil) or clears (key nil) a bill's slip together
+// with slip_uploaded_at. edited_at is not touched — a slip change is not an
+// edit of the bill.
+func setBillSlip(db *gorm.DB, id int, key *string, now time.Time) error {
+	var uploadedAt *time.Time
+	if key != nil {
+		uploadedAt = &now
+	}
+	return db.Model(&models.Bill{}).Where("id = ?", id).Updates(map[string]any{
+		"slip":             key,
+		"slip_uploaded_at": uploadedAt,
+	}).Error
+}
+
 func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (models.Bill, error) {
 	var (
 		_, childSpan = r.tracer.TraceStart(ctx, "CreateBillRepository", trace.WithAttributes(attribute.String("repository", "CreateBill")))
@@ -331,27 +401,7 @@ func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (mode
 					})
 				}
 
-				bill = models.Bill{
-					StoreID:         input.StoreID,
-					Type:            input.Type,
-					CustomerID:      &customerID,
-					BookNo:          bookNo,
-					ReceiptNo:       receiptNo,
-					CustomerName:    input.CustomerName,
-					CustomerAddress: input.CustomerAddress,
-					CustomerPhone:   input.CustomerPhone,
-					Discount:        input.Discount,
-					ShippingFee:     input.ShippingFee,
-					Total:           input.Total,
-					Slip:            nil,
-				}
-				// A caller-supplied CreatedAt back-/post-dates the bill —
-				// GORM only auto-fills CreatedAt when it's still the zero
-				// value, so setting it here before Create is enough to
-				// override the column's CURRENT_TIMESTAMP default.
-				if input.CreatedAt != nil {
-					bill.CreatedAt = *input.CreatedAt
-				}
+				bill = newBill(input, bookNo, receiptNo, customerID)
 
 				if txErr := tx.Create(&bill).Error; txErr != nil {
 					return txErr
@@ -398,7 +448,7 @@ func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (mode
 	// Reload with Store + Items.Product preloaded to match the shape
 	// responses.BillDetailResponse.Make expects (storeName, each item's
 	// productName).
-	if err = r.db.Preload("Store").Preload("Items.Product").First(&bill, bill.ID).Error; err != nil {
+	if err = preloadBillDetail(r.db).First(&bill, bill.ID).Error; err != nil {
 		return bill, err
 	}
 
@@ -456,13 +506,7 @@ func (r Repository) UpdateBill(ctx context.Context, id int, input UpdateBillInpu
 					return txErr
 				}
 
-				bill.CustomerID = &customerID
-				bill.CustomerName = input.CustomerName
-				bill.CustomerAddress = input.CustomerAddress
-				bill.CustomerPhone = input.CustomerPhone
-				bill.Discount = input.Discount
-				bill.ShippingFee = input.ShippingFee
-				bill.Total = input.Total
+				applyBillUpdate(&bill, input, customerID, time.Now())
 
 				if txErr := tx.Save(&bill).Error; txErr != nil {
 					return txErr
@@ -501,7 +545,7 @@ func (r Repository) UpdateBill(ctx context.Context, id int, input UpdateBillInpu
 
 	// Reload with Store + Items.Product preloaded to match the shape
 	// responses.BillDetailResponse.Make expects.
-	if err = r.db.Preload("Store").Preload("Items.Product").First(&bill, bill.ID).Error; err != nil {
+	if err = preloadBillDetail(r.db).First(&bill, bill.ID).Error; err != nil {
 		return bill, err
 	}
 
@@ -695,7 +739,8 @@ func (r Repository) GetBillSlipKey(ctx context.Context, id int) (*string, error)
 	return bill.Slip, nil
 }
 
-// UpdateBillSlip sets (or clears, when key is nil) a bill's slip object key.
+// UpdateBillSlip sets (or clears, when key is nil) a bill's slip object key
+// and its slip_uploaded_at — see setBillSlip.
 func (r Repository) UpdateBillSlip(ctx context.Context, id int, key *string) error {
 	var (
 		_, childSpan = r.tracer.TraceStart(ctx, "UpdateBillSlipRepository", trace.WithAttributes(attribute.String("repository", "UpdateBillSlip"), attribute.Int64("id", int64(id))))
@@ -704,7 +749,7 @@ func (r Repository) UpdateBillSlip(ctx context.Context, id int, key *string) err
 
 	utils.Block{
 		Try: func() {
-			if err = r.db.Model(&models.Bill{}).Where("id = ?", id).Update("slip", key).Error; err != nil {
+			if err = setBillSlip(r.db, id, key, time.Now()); err != nil {
 				utils.Throw(err)
 			}
 		},

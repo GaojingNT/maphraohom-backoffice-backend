@@ -1,8 +1,10 @@
 package bill_module
 
 import (
+	"database/sql/driver"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"gorm.io/driver/postgres"
@@ -103,5 +105,90 @@ func TestNextBillNumbers_MissingSequenceRow(t *testing.T) {
 func TestNextBillNumbersQueryIsValidRegexp(t *testing.T) {
 	if _, err := regexp.Compile(nextBillNumbersQuery); err != nil {
 		t.Fatalf("nextBillNumbersQuery is not a valid regexp: %v", err)
+	}
+}
+
+// (a) A new bill records who created it, and starts never-edited with no
+// slip timestamp.
+func TestNewBill_RecordsCreatorAndStartsUnedited(t *testing.T) {
+	userID := 7
+	bill := newBill(CreateBillInput{StoreID: 1, Type: models.BillTypeReceipt, CreatedBy: &userID}, 1, 1, 3)
+
+	if bill.CreatedBy == nil || *bill.CreatedBy != userID {
+		t.Fatalf("CreatedBy = %v, want %d", bill.CreatedBy, userID)
+	}
+	if bill.EditedAt != nil {
+		t.Errorf("EditedAt = %v, want nil on a new bill", bill.EditedAt)
+	}
+	if bill.SlipUploadedAt != nil || bill.Slip != nil {
+		t.Errorf("new bill has slip fields set: slip=%v slipUploadedAt=%v", bill.Slip, bill.SlipUploadedAt)
+	}
+}
+
+// (b) An edit stamps EditedAt and leaves the slip fields as they were.
+func TestApplyBillUpdate_StampsEditedAt(t *testing.T) {
+	key := "bills/slips/a.png"
+	uploaded := time.Date(2026, 9, 26, 7, 32, 0, 0, time.UTC)
+	bill := models.Bill{Slip: &key, SlipUploadedAt: &uploaded}
+	now := time.Date(2026, 9, 26, 10, 2, 0, 0, time.UTC)
+
+	applyBillUpdate(&bill, UpdateBillInput{CustomerName: "ป้ามาลี"}, 3, now)
+
+	if bill.EditedAt == nil || !bill.EditedAt.Equal(now) {
+		t.Fatalf("EditedAt = %v, want %v", bill.EditedAt, now)
+	}
+	if bill.Slip != &key || bill.SlipUploadedAt == nil || !bill.SlipUploadedAt.Equal(uploaded) {
+		t.Errorf("edit changed slip fields: slip=%v slipUploadedAt=%v", bill.Slip, bill.SlipUploadedAt)
+	}
+}
+
+// setBillSlipQuery pins the full SET list, so (d) is checked too: a slip
+// change writes slip + slip_uploaded_at (+ GORM's updated_at) and never
+// edited_at. The table prefix is optional: the mock DB doesn't get the
+// app's tbl_ naming strategy.
+var setBillSlipQuery = `UPDATE "(tbl_)?bills" ` + regexp.QuoteMeta(`SET "slip"=$1,"slip_uploaded_at"=$2,"updated_at"=$3 WHERE id = $4`)
+
+// nonNilTime matches any non-nil time.Time argument.
+type nonNilTime struct{}
+
+func (nonNilTime) Match(v driver.Value) bool {
+	_, ok := v.(time.Time)
+	return ok
+}
+
+// (c)+(d) Attaching a slip sets slip_uploaded_at, not edited_at.
+func TestSetBillSlip_AttachStampsSlipUploadedAt(t *testing.T) {
+	gormDB, mock := newMockGormDB(t)
+	key := "bills/slips/a.png"
+
+	mock.ExpectBegin()
+	mock.ExpectExec(setBillSlipQuery).
+		WithArgs(key, nonNilTime{}, sqlmock.AnyArg(), 5).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	if err := setBillSlip(gormDB, 5, &key, time.Now()); err != nil {
+		t.Fatalf("setBillSlip returned error: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// (c) Removing the slip clears slip_uploaded_at back to NULL.
+func TestSetBillSlip_RemoveClearsSlipUploadedAt(t *testing.T) {
+	gormDB, mock := newMockGormDB(t)
+
+	mock.ExpectBegin()
+	mock.ExpectExec(setBillSlipQuery).
+		WithArgs(nil, nil, sqlmock.AnyArg(), 5).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	if err := setBillSlip(gormDB, 5, nil, time.Now()); err != nil {
+		t.Fatalf("setBillSlip returned error: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
 	}
 }

@@ -143,7 +143,10 @@ func (c Controller) CreateBill(f *fiber.Ctx) error {
 		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, err)
 	}
 
-	responseData, fieldErrors, err := c.billService().CreateBill(ctx, dto)
+	// JwtAuthProtected guards every bill route, so authUser is always set.
+	authUser := f.Locals("authUser").(*models.User)
+
+	responseData, fieldErrors, err := c.billService().CreateBill(ctx, dto, authUser.ID)
 	if len(fieldErrors) > 0 {
 		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, exception.ErrInvalidRequestParameter, fieldErrors...)
 	}
