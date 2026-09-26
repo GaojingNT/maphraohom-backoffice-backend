@@ -146,6 +146,202 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "put": {
+                "description": "Replace the signed-in user's first name, last name and email. The signature is uploaded through its own endpoint.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth Module (Version 1)"
+                ],
+                "summary": "Update profile",
+                "parameters": [
+                    {
+                        "description": "profile",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtos.UpdateProfileDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/responses.GetProfileResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/profile/password": {
+            "put": {
+                "description": "Replace the signed-in user's password. The current password must be given and correct; newPassword must be 8+ characters and match confirmPassword.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth Module (Version 1)"
+                ],
+                "summary": "Change my password",
+                "parameters": [
+                    {
+                        "description": "passwords",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ChangePasswordDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http_response.OkResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/profile/signature": {
+            "put": {
+                "description": "Upload a signature image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for the signed-in user. Replaces any existing signature. Printed on every receipt this user exports.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth Module (Version 1)"
+                ],
+                "summary": "Upload my signature",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "signature image",
+                        "name": "signature",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "signature": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Clear the signed-in user's signature and remove the underlying file (best-effort)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth Module (Version 1)"
+                ],
+                "summary": "Delete my signature",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http_response.OkResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/exception.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/api/v1/auth/reset-password": {
@@ -1148,7 +1344,7 @@ const docTemplate = `{
                 }
             },
             "put": {
-                "description": "Replace a store's name, address, and phone. Logo/signature are uploaded through their own endpoints.",
+                "description": "Replace a store's name, address, and phone. The logo is uploaded through its own endpoint.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1272,110 +1468,6 @@ const docTemplate = `{
                     "Store Module (Version 1)"
                 ],
                 "summary": "Delete a store's logo",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "store id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/http_response.OkResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/exception.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/exception.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/stores/{id}/signature": {
-            "put": {
-                "description": "Upload a signature image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing store. Replaces any existing signature.",
-                "consumes": [
-                    "multipart/form-data"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Store Module (Version 1)"
-                ],
-                "summary": "Upload a store's signature",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "store id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "file",
-                        "description": "signature image",
-                        "name": "signature",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "signature": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/exception.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/exception.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/exception.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Clear a store's signature and remove the underlying file (best-effort)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Store Module (Version 1)"
-                ],
-                "summary": "Delete a store's signature",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1761,6 +1853,27 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "dtos.ChangePasswordDto": {
+            "type": "object",
+            "required": [
+                "confirmPassword",
+                "currentPassword",
+                "newPassword"
+            ],
+            "properties": {
+                "confirmPassword": {
+                    "type": "string"
+                },
+                "currentPassword": {
+                    "type": "string"
+                },
+                "newPassword": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 8
+                }
+            }
+        },
         "dtos.CreateBill": {
             "type": "object",
             "properties": {
@@ -1888,6 +2001,26 @@ const docTemplate = `{
                 }
             }
         },
+        "dtos.UpdateProfileDto": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "firstName": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "lastName": {
+                    "type": "string",
+                    "maxLength": 100
+                }
+            }
+        },
         "dtos.UpdateStore": {
             "type": "object",
             "properties": {
@@ -1972,6 +2105,20 @@ const docTemplate = `{
                 }
             }
         },
+        "responses.BillCreatorResponse": {
+            "type": "object",
+            "properties": {
+                "firstName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "lastName": {
+                    "type": "string"
+                }
+            }
+        },
         "responses.BillDetailResponse": {
             "type": "object",
             "properties": {
@@ -1980,6 +2127,14 @@ const docTemplate = `{
                 },
                 "createdAt": {
                     "type": "string"
+                },
+                "createdBy": {
+                    "description": "Audit fields — each is JSON null (never omitted, never a zero\ntime) when unknown: createdBy for bills from before it was\nrecorded, editedAt when never edited via PUT /bills/:id,\nslipUploadedAt when there's no slip.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/responses.BillCreatorResponse"
+                        }
+                    ]
                 },
                 "customerAddress": {
                     "type": "string"
@@ -1996,6 +2151,9 @@ const docTemplate = `{
                 "discount": {
                     "type": "number"
                 },
+                "editedAt": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -2010,6 +2168,9 @@ const docTemplate = `{
                 },
                 "shippingFee": {
                     "type": "number"
+                },
+                "slipUploadedAt": {
+                    "type": "string"
                 },
                 "slipUrl": {
                     "type": "string"
@@ -2027,9 +2188,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "storePhone": {
-                    "type": "string"
-                },
-                "storeSignature": {
                     "type": "string"
                 },
                 "total": {
@@ -2156,6 +2314,16 @@ const docTemplate = `{
                         }
                     ]
                 },
+                "signature": {
+                    "description": "Ready-to-use URL of the user's signature image — printed on every\nreceipt they export. Empty string when unset.",
+                    "type": "string"
+                },
+                "stores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/responses.GetProfileStoreResponse"
+                    }
+                },
                 "updatedAt": {
                     "type": "string"
                 }
@@ -2274,6 +2442,20 @@ const docTemplate = `{
                 }
             }
         },
+        "responses.GetProfileStoreResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "logo": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "responses.GetUserByIDResponse": {
             "type": "object",
             "properties": {
@@ -2331,13 +2513,33 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "owners": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/responses.StoreOwnerResponse"
+                    }
+                },
                 "phone": {
                     "type": "string"
                 },
-                "signature": {
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.StoreOwnerResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
                     "type": "string"
                 },
-                "updatedAt": {
+                "firstName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "lastName": {
                     "type": "string"
                 }
             }

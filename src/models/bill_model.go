@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -63,6 +65,22 @@ type Bill struct {
 	// slip has been attached yet; it is set/cleared only through the
 	// dedicated slip endpoints, never by POST/PUT /bills.
 	Slip *string `json:"slip" gorm:"column:slip;size:255;"`
+
+	// Audit fields. updated_at can't answer "when was this bill edited" —
+	// it also moves when a slip is attached or removed — so edits and slip
+	// changes are tracked separately. All nil for bills from before these
+	// columns existed (edited_at/created_by were never recorded).
+	//
+	// CreatedBy is the user logged in when the bill was created. Creator is
+	// preloaded with id/first_name/last_name only and never serialized
+	// straight from the model (it would carry email and signature).
+	CreatedBy *int  `json:"createdBy" gorm:"column:created_by;null;"`
+	Creator   *User `json:"-" gorm:"foreignKey:CreatedBy;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	// EditedAt is set by PUT /bills/:id only.
+	EditedAt *time.Time `json:"editedAt" gorm:"column:edited_at;null;"`
+	// SlipUploadedAt is set when a slip is attached or replaced and cleared
+	// when it's removed — always together with Slip.
+	SlipUploadedAt *time.Time `json:"slipUploadedAt" gorm:"column:slip_uploaded_at;null;"`
 
 	// Soft delete
 	DeletedAt gorm.DeletedAt `json:"deletedAt,omitempty" gorm:"column:deleted_at;index;"`

@@ -1,4 +1,19 @@
 definitions:
+  dtos.ChangePasswordDto:
+    properties:
+      confirmPassword:
+        type: string
+      currentPassword:
+        type: string
+      newPassword:
+        maxLength: 100
+        minLength: 8
+        type: string
+    required:
+    - confirmPassword
+    - currentPassword
+    - newPassword
+    type: object
   dtos.CreateBill:
     properties:
       createdAt:
@@ -88,6 +103,20 @@ definitions:
       type:
         type: string
     type: object
+  dtos.UpdateProfileDto:
+    properties:
+      email:
+        maxLength: 100
+        type: string
+      firstName:
+        maxLength: 100
+        type: string
+      lastName:
+        maxLength: 100
+        type: string
+    required:
+    - email
+    type: object
   dtos.UpdateStore:
     properties:
       address:
@@ -143,12 +172,29 @@ definitions:
       totalRows:
         type: integer
     type: object
+  responses.BillCreatorResponse:
+    properties:
+      firstName:
+        type: string
+      id:
+        type: integer
+      lastName:
+        type: string
+    type: object
   responses.BillDetailResponse:
     properties:
       bookNo:
         type: integer
       createdAt:
         type: string
+      createdBy:
+        allOf:
+        - $ref: '#/definitions/responses.BillCreatorResponse'
+        description: |-
+          Audit fields — each is JSON null (never omitted, never a zero
+          time) when unknown: createdBy for bills from before it was
+          recorded, editedAt when never edited via PUT /bills/:id,
+          slipUploadedAt when there's no slip.
       customerAddress:
         type: string
       customerId:
@@ -159,6 +205,8 @@ definitions:
         type: string
       discount:
         type: number
+      editedAt:
+        type: string
       id:
         type: integer
       items:
@@ -169,6 +217,8 @@ definitions:
         type: integer
       shippingFee:
         type: number
+      slipUploadedAt:
+        type: string
       slipUrl:
         type: string
       storeAddress:
@@ -180,8 +230,6 @@ definitions:
       storeName:
         type: string
       storePhone:
-        type: string
-      storeSignature:
         type: string
       total:
         type: number
@@ -263,6 +311,15 @@ definitions:
         allOf:
         - $ref: '#/definitions/responses.GetProfileRoleResponse'
         description: Relations
+      signature:
+        description: |-
+          Ready-to-use URL of the user's signature image — printed on every
+          receipt they export. Empty string when unset.
+        type: string
+      stores:
+        items:
+          $ref: '#/definitions/responses.GetProfileStoreResponse'
+        type: array
       updatedAt:
         type: string
     type: object
@@ -339,6 +396,15 @@ definitions:
         - $ref: '#/definitions/responses.GetProfileRoleGroupRoleResponse'
         description: Relations
     type: object
+  responses.GetProfileStoreResponse:
+    properties:
+      id:
+        type: integer
+      logo:
+        type: string
+      name:
+        type: string
+    type: object
   responses.GetUserByIDResponse:
     properties:
       code:
@@ -376,11 +442,24 @@ definitions:
         type: string
       name:
         type: string
+      owners:
+        items:
+          $ref: '#/definitions/responses.StoreOwnerResponse'
+        type: array
       phone:
         type: string
-      signature:
-        type: string
       updatedAt:
+        type: string
+    type: object
+  responses.StoreOwnerResponse:
+    properties:
+      email:
+        type: string
+      firstName:
+        type: string
+      id:
+        type: integer
+      lastName:
         type: string
     type: object
   responses.UserResponse:
@@ -495,6 +574,140 @@ paths:
           schema:
             $ref: '#/definitions/http_response.OkResponse'
       summary: Get profile
+      tags:
+      - Auth Module (Version 1)
+    put:
+      consumes:
+      - application/json
+      description: Replace the signed-in user's first name, last name and email. The
+        signature is uploaded through its own endpoint.
+      parameters:
+      - description: profile
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.UpdateProfileDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.GetProfileResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Update profile
+      tags:
+      - Auth Module (Version 1)
+  /api/v1/auth/profile/password:
+    put:
+      consumes:
+      - application/json
+      description: Replace the signed-in user's password. The current password must
+        be given and correct; newPassword must be 8+ characters and match confirmPassword.
+      parameters:
+      - description: passwords
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.ChangePasswordDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http_response.OkResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Change my password
+      tags:
+      - Auth Module (Version 1)
+  /api/v1/auth/profile/signature:
+    delete:
+      consumes:
+      - application/json
+      description: Clear the signed-in user's signature and remove the underlying
+        file (best-effort)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http_response.OkResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Delete my signature
+      tags:
+      - Auth Module (Version 1)
+    put:
+      consumes:
+      - multipart/form-data
+      description: Upload a signature image (jpeg/png/webp, checked by magic bytes,
+        ≤ 10MB) for the signed-in user. Replaces any existing signature. Printed on
+        every receipt this user exports.
+      parameters:
+      - description: signature image
+        in: formData
+        name: signature
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              signature:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      summary: Upload my signature
       tags:
       - Auth Module (Version 1)
   /api/v1/auth/reset-password:
@@ -1177,8 +1390,8 @@ paths:
     put:
       consumes:
       - application/json
-      description: Replace a store's name, address, and phone. Logo/signature are
-        uploaded through their own endpoints.
+      description: Replace a store's name, address, and phone. The logo is uploaded
+        through its own endpoint.
       parameters:
       - description: store id
         in: path
@@ -1277,76 +1490,6 @@ paths:
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
       summary: Upload a store's logo
-      tags:
-      - Store Module (Version 1)
-  /api/v1/stores/{id}/signature:
-    delete:
-      consumes:
-      - application/json
-      description: Clear a store's signature and remove the underlying file (best-effort)
-      parameters:
-      - description: store id
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/http_response.OkResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/exception.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/exception.ErrorResponse'
-      summary: Delete a store's signature
-      tags:
-      - Store Module (Version 1)
-    put:
-      consumes:
-      - multipart/form-data
-      description: Upload a signature image (jpeg/png/webp, checked by magic bytes,
-        ≤ 10MB) for an existing store. Replaces any existing signature.
-      parameters:
-      - description: store id
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: signature image
-        in: formData
-        name: signature
-        required: true
-        type: file
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            properties:
-              signature:
-                type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/exception.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/exception.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/exception.ErrorResponse'
-      summary: Upload a store's signature
       tags:
       - Store Module (Version 1)
   /api/v1/stores/{storeId}/last-prices:

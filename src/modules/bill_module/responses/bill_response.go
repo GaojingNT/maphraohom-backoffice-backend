@@ -2,6 +2,7 @@ package responses
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/shopspring/decimal"
 	"maphraohom.app/maphraohom-backoffice/src/models"
@@ -40,26 +41,41 @@ type (
 	// printable profile (name/logo/address/phone), a ready-to-use
 	// slip URL, and its line items (with each item's product name).
 	BillDetailResponse struct {
-		ID              int              `json:"id"`
-		Type            string           `json:"type"`
-		StoreID         int              `json:"storeId"`
-		StoreName       string           `json:"storeName"`
-		StoreLogo       string           `json:"storeLogo"`
-		StoreAddress    string           `json:"storeAddress"`
-		StorePhone      string           `json:"storePhone"`
-		CustomerID      *int             `json:"customerId,omitempty"`
-		BookNo          int              `json:"bookNo"`
-		ReceiptNo       int              `json:"receiptNo"`
-		CustomerName    string           `json:"customerName"`
-		CustomerAddress string           `json:"customerAddress"`
-		CustomerPhone   string           `json:"customerPhone"`
-		Discount        decimal.Decimal  `json:"discount"`
-		ShippingFee     decimal.Decimal  `json:"shippingFee"`
-		Total           decimal.Decimal  `json:"total"`
-		SlipURL         *string          `json:"slipUrl"`
-		CreatedAt       string           `json:"createdAt"`
-		UpdatedAt       string           `json:"updatedAt"`
-		Items           []BillItemDetail `json:"items"`
+		ID              int             `json:"id"`
+		Type            string          `json:"type"`
+		StoreID         int             `json:"storeId"`
+		StoreName       string          `json:"storeName"`
+		StoreLogo       string          `json:"storeLogo"`
+		StoreAddress    string          `json:"storeAddress"`
+		StorePhone      string          `json:"storePhone"`
+		CustomerID      *int            `json:"customerId,omitempty"`
+		BookNo          int             `json:"bookNo"`
+		ReceiptNo       int             `json:"receiptNo"`
+		CustomerName    string          `json:"customerName"`
+		CustomerAddress string          `json:"customerAddress"`
+		CustomerPhone   string          `json:"customerPhone"`
+		Discount        decimal.Decimal `json:"discount"`
+		ShippingFee     decimal.Decimal `json:"shippingFee"`
+		Total           decimal.Decimal `json:"total"`
+		SlipURL         *string         `json:"slipUrl"`
+		CreatedAt       string          `json:"createdAt"`
+		UpdatedAt       string          `json:"updatedAt"`
+		// Audit fields — each is JSON null (never omitted, never a zero
+		// time) when unknown: createdBy for bills from before it was
+		// recorded, editedAt when never edited via PUT /bills/:id,
+		// slipUploadedAt when there's no slip.
+		CreatedBy      *BillCreatorResponse `json:"createdBy"`
+		EditedAt       *time.Time           `json:"editedAt"`
+		SlipUploadedAt *time.Time           `json:"slipUploadedAt"`
+		Items          []BillItemDetail     `json:"items"`
+	}
+
+	// BillCreatorResponse is who created a bill — name only, deliberately
+	// no email or signature.
+	BillCreatorResponse struct {
+		ID        int    `json:"id"`
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
 	}
 )
 
@@ -133,6 +149,15 @@ func (response *BillDetailResponse) Make(bill models.Bill) *BillDetailResponse {
 		slipURL = &url
 	}
 
+	var createdBy *BillCreatorResponse
+	if bill.Creator != nil {
+		createdBy = &BillCreatorResponse{
+			ID:        bill.Creator.ID,
+			FirstName: bill.Creator.FirstName,
+			LastName:  bill.Creator.LastName,
+		}
+	}
+
 	return &BillDetailResponse{
 		ID:              bill.ID,
 		Type:            bill.Type,
@@ -153,6 +178,9 @@ func (response *BillDetailResponse) Make(bill models.Bill) *BillDetailResponse {
 		SlipURL:         slipURL,
 		CreatedAt:       bill.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt:       bill.UpdatedAt.Format("2006-01-02 15:04:05"),
+		CreatedBy:       createdBy,
+		EditedAt:        bill.EditedAt,
+		SlipUploadedAt:  bill.SlipUploadedAt,
 		Items:           items,
 	}
 }

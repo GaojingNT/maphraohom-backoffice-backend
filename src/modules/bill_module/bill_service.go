@@ -127,8 +127,8 @@ func (s Service) validateAndPrice(ctx context.Context, billType string, customer
 
 // CreateBill validates, prices, and creates a bill. Returns field errors
 // (for a 400 response) when the request itself is invalid; err is reserved
-// for infrastructure failures.
-func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill) (*responses.BillDetailResponse, []exception.ParameterError, error) {
+// for infrastructure failures. createdBy is the logged-in user's id.
+func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill, createdBy int) (*responses.BillDetailResponse, []exception.ParameterError, error) {
 	ctx, childSpan := s.tracer.TraceStart(ctx, "CreateBillService", trace.WithAttributes(attribute.String("service", "CreateBill")))
 	defer s.tracer.TraceEnd(childSpan)
 
@@ -154,6 +154,7 @@ func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill) (*respons
 		Total:           total,
 		Items:           pricedItems,
 		CreatedAt:       dto.CreatedAt,
+		CreatedBy:       &createdBy,
 	})
 	if err != nil {
 		return nil, nil, err
