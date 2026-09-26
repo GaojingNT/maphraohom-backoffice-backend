@@ -57,9 +57,14 @@ func (c Controller) GetBills(f *fiber.Ctx) error {
 	}
 
 	// Get paginate values
+	// Newest first by the bill's own date (created_at can be back-dated, so
+	// id order is not date order); id breaks ties. Paginate renders this as
+	// "created_at desc, id desc".
 	paginate := paginator.NewPagination(
 		paginator.WithPage(queryPage),
 		paginator.WithLimit(queryLimit),
+		paginator.WithOrderBy("created_at desc, id"),
+		paginator.WithSort("desc"),
 		paginator.WithAttributes("search", querySearch),
 		paginator.WithAttributes("search_by", querySearchBy),
 		paginator.WithAttributes("searchable", models.BillSearchable()),
