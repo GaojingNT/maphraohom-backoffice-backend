@@ -27,6 +27,7 @@ import (
 //	@Success		200		{object}	paginator.Pagination
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/users [get]
 func (c Controller) GetUsers(f *fiber.Ctx) error {
 	var (
@@ -74,6 +75,7 @@ func (c Controller) GetUsers(f *fiber.Ctx) error {
 //	@Success		200		{object}	responses.GetUserByIDResponse
 //	@Failure		404		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/users/{user_id} [get]
 func (c Controller) GetUser(f *fiber.Ctx) error {
 	var (
@@ -109,6 +111,7 @@ func (c Controller) GetUser(f *fiber.Ctx) error {
 //	@Success		200			{object}	http_response.OkResponse
 //	@Failure		404			{object}	exception.ErrorResponse
 //	@Failure		500			{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/users [post]
 func (c Controller) CreateUser(f *fiber.Ctx) error {
 	var (
@@ -157,6 +160,7 @@ func (c Controller) CreateUser(f *fiber.Ctx) error {
 //	@Success		200			{object}	http_response.OkResponse
 //	@Failure		404			{object}	exception.ErrorResponse
 //	@Failure		500			{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/users/{user_id} [put]
 func (c Controller) UpdateUser(f *fiber.Ctx) error {
 	var (
@@ -203,6 +207,7 @@ func (c Controller) UpdateUser(f *fiber.Ctx) error {
 //	@Success		200		{object}	http_response.OkResponse
 //	@Failure		404		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/users/{user_id} [delete]
 func (c Controller) DeleteUser(f *fiber.Ctx) error {
 	var (

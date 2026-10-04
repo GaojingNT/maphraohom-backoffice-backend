@@ -16,6 +16,7 @@ import (
 //	@Produce		json
 //	@Success		200	{array}		responses.ProductListItem
 //	@Failure		500	{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/products [get]
 func (c Controller) GetProducts(f *fiber.Ctx) error {
 	ctx, span := c.m.tracer.TraceStart(f.Context(), "GetProductsController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "GetProducts")))

@@ -23,6 +23,7 @@ import (
 //	@Param			search	query		string	false	"search keyword"
 //	@Success		200		{object}	paginator.Pagination
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/customers [get]
 func (c Controller) GetCustomers(f *fiber.Ctx) error {
 	var (
@@ -64,6 +65,7 @@ func (c Controller) GetCustomers(f *fiber.Ctx) error {
 //	@Success		200	{object}	responses.CustomerDetailResponse
 //	@Failure		404	{object}	exception.ErrorResponse
 //	@Failure		500	{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/customers/{id} [get]
 func (c Controller) GetCustomer(f *fiber.Ctx) error {
 	id, _ := f.ParamsInt("id")
@@ -91,6 +93,7 @@ func (c Controller) GetCustomer(f *fiber.Ctx) error {
 //	@Param			id	path		int	true	"customer id"
 //	@Success		200	{array}		responses.CustomerAddressItem
 //	@Failure		500	{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/customers/{id}/addresses [get]
 func (c Controller) GetCustomerAddresses(f *fiber.Ctx) error {
 	id, _ := f.ParamsInt("id")
@@ -115,6 +118,7 @@ func (c Controller) GetCustomerAddresses(f *fiber.Ctx) error {
 //	@Param			id	path		int	true	"customer id"
 //	@Success		200	{array}		responses.CustomerPhoneItem
 //	@Failure		500	{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/customers/{id}/phones [get]
 func (c Controller) GetCustomerPhones(f *fiber.Ctx) error {
 	id, _ := f.ParamsInt("id")
@@ -140,6 +144,7 @@ func (c Controller) GetCustomerPhones(f *fiber.Ctx) error {
 //	@Success		200		{object}	responses.CustomerDetailResponse
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/customers [post]
 func (c Controller) CreateCustomer(f *fiber.Ctx) error {
 	ctx, span := c.m.tracer.TraceStart(f.Context(), "CreateCustomerController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "CreateCustomer")))
@@ -176,6 +181,7 @@ func (c Controller) CreateCustomer(f *fiber.Ctx) error {
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		404		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/customers/{id}/addresses [post]
 func (c Controller) CreateCustomerAddress(f *fiber.Ctx) error {
 	id, _ := f.ParamsInt("id")
@@ -210,12 +216,13 @@ func (c Controller) CreateCustomerAddress(f *fiber.Ctx) error {
 //	@Tags			Customer Module (Version 1)
 //	@Accept			json
 //	@Produce		json
-//	@Param			id		path		int						true	"customer id"
+//	@Param			id		path		int							true	"customer id"
 //	@Param			body	body		dtos.CreateCustomerPhone	true	"phone"
 //	@Success		200		{object}	responses.CustomerPhoneItem
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		404		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/customers/{id}/phones [post]
 func (c Controller) CreateCustomerPhone(f *fiber.Ctx) error {
 	id, _ := f.ParamsInt("id")
