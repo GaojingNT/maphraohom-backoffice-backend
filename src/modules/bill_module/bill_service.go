@@ -94,15 +94,16 @@ func (s Service) matchTypedItems(ctx context.Context, billType string, items []d
 }
 
 // resolveAndPriceItems turns already-validated dto-level items into priced
-// CreateBillItemInput rows — the unit is the catalog product's, or the
-// picked one for a typed-in item (created by the repository).
-func (s Service) resolveAndPriceItems(ctx context.Context, items []dtos.CreateBillItem, products map[int]models.Product) []CreateBillItemInput {
+// CreateBillItemInput rows, each billed in itemUnit (on a payment bill, the
+// unit the user set). Typed-in items' products are created by the
+// repository.
+func (s Service) resolveAndPriceItems(ctx context.Context, billType string, items []dtos.CreateBillItem, products map[int]models.Product) []CreateBillItemInput {
 	priced := make([]CreateBillItemInput, 0, len(items))
 	for _, item := range items {
 		if item.ProductID == 0 {
 			priced = append(priced, CreateBillItemInput{
 				NewProductName: item.ProductName,
-				Unit:           item.Unit,
+				Unit:           itemUnit(billType, item, nil),
 				Quantity:       item.Quantity,
 				Price:          item.Price,
 				Subtotal:       computeSubtotal(item.Quantity, item.Price),
@@ -115,12 +116,16 @@ func (s Service) resolveAndPriceItems(ctx context.Context, items []dtos.CreateBi
 			// doesn't panic on a zero-value Product.
 			continue
 		}
+		unit := itemUnit(billType, item, &product)
 		priced = append(priced, CreateBillItemInput{
 			ProductID: item.ProductID,
-			Unit:      product.Unit,
-			Quantity:  item.Quantity,
-			Price:     item.Price,
-			Subtotal:  computeSubtotal(item.Quantity, item.Price),
+			Unit:      unit,
+			// A payment-only product defaults to the unit it was last
+			// billed in; catalog products keep theirs (receipt bills use it).
+			RememberUnit: product.BillScope == models.ProductScopePayment && unit != product.Unit,
+			Quantity:     item.Quantity,
+			Price:        item.Price,
+			Subtotal:     computeSubtotal(item.Quantity, item.Price),
 		})
 	}
 	return priced
@@ -165,7 +170,7 @@ func (s Service) validateAndPrice(ctx context.Context, billType string, customer
 		return nil, decimal.Zero, fieldErrors, nil
 	}
 
-	pricedItems := s.resolveAndPriceItems(ctx, items, products)
+	pricedItems := s.resolveAndPriceItems(ctx, billType, items, products)
 
 	subtotals := make([]decimal.Decimal, 0, len(pricedItems))
 	for _, item := range pricedItems {

@@ -25,10 +25,14 @@ import (
 // ProductID 0 means a typed-in payment-bill item whose product doesn't
 // exist yet: the repository creates it (or picks up one created
 // concurrently) from NewProductName/Unit inside the bill's transaction.
+//
+// RememberUnit makes Unit the product's new default unit (payment-only
+// products, when billed in a different unit than their current one).
 type CreateBillItemInput struct {
 	ProductID      int
 	NewProductName string
 	Unit           string
+	RememberUnit   bool
 	Quantity       decimal.Decimal
 	Price          decimal.Decimal
 	Subtotal       decimal.Decimal
@@ -288,9 +292,15 @@ func (r Repository) GetProductsByName(ctx context.Context, names []string) (map[
 // first for a typed-in payment-bill item (ProductID 0). A transaction-scoped
 // advisory lock on the name serializes concurrent bills typing the same new
 // name, and the lookup is repeated under it, so they end up sharing one
-// product instead of creating two.
+// product instead of creating two. A payment-only product's default unit
+// follows the unit it was last billed in.
 func resolveItemProductID(tx *gorm.DB, item CreateBillItemInput) (int, error) {
 	if item.ProductID != 0 {
+		if item.RememberUnit {
+			if err := rememberProductUnit(tx, item.ProductID, item.Unit); err != nil {
+				return 0, err
+			}
+		}
 		return item.ProductID, nil
 	}
 
@@ -302,6 +312,12 @@ func resolveItemProductID(tx *gorm.DB, item CreateBillItemInput) (int, error) {
 	var existing models.Product
 	err := tx.Where("lower(name) = ?", key).Order("id").First(&existing).Error
 	if err == nil {
+		// Created by a concurrent bill since the service looked it up.
+		if existing.Unit != item.Unit {
+			if err := rememberProductUnit(tx, existing.ID, item.Unit); err != nil {
+				return 0, err
+			}
+		}
 		return existing.ID, nil
 	}
 	if err != gorm.ErrRecordNotFound {
@@ -317,6 +333,14 @@ func resolveItemProductID(tx *gorm.DB, item CreateBillItemInput) (int, error) {
 		return 0, err
 	}
 	return product.ID, nil
+}
+
+// rememberProductUnit sets a payment-only product's default unit. Catalog
+// ("all") products are never touched — receipt bills bill in their unit.
+func rememberProductUnit(tx *gorm.DB, productID int, unit string) error {
+	return tx.Model(&models.Product{}).
+		Where("id = ? AND bill_scope = ?", productID, models.ProductScopePayment).
+		Update("unit", unit).Error
 }
 
 // CustomerExists reports whether a (non-deleted) customer with this id

@@ -2,7 +2,6 @@ package bill_module
 
 import (
 	"fmt"
-	"strings"
 	"unicode/utf8"
 
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
@@ -16,6 +15,22 @@ const bottleUnit = "ขวด"
 // maxProductNameLength matches tbl_products.name's size.
 const maxProductNameLength = 255
 
+// itemUnit is the unit a bill item is billed in. On a payment bill the
+// unit the user set wins (normalized like a product name), falling back to
+// the product's own; a receipt bill always uses the product's unit.
+// product is nil for a typed-in item.
+func itemUnit(billType string, item dtos.CreateBillItem, product *models.Product) string {
+	if billType == models.BillTypePayment {
+		if unit := models.NormalizeProductName(item.Unit); unit != "" {
+			return unit
+		}
+	}
+	if product != nil {
+		return product.Unit
+	}
+	return ""
+}
+
 // validateBillInput checks every field shared by create and update requests
 // against business rules that need more than a struct tag: bill type
 // whitelist, non-negative discount/shipping fee, at least one item, and per
@@ -23,8 +38,9 @@ const maxProductNameLength = 255
 // number). products maps a referenced productId to its catalog row; a
 // missing key means the id doesn't exist or was soft-deleted. A receipt bill
 // may only use ProductScopeAll products; a typed-in item (productId 0) is
-// allowed on a payment bill only, with a name and one of
-// models.PaymentItemUnits.
+// allowed on a payment bill only, with a name and a unit. On a payment bill
+// every item's unit can be set (see itemUnit); it must be non-empty and at
+// most models.MaxUnitLength characters.
 //
 // Every error names the exact field/row it came from (e.g. "items[1].quantity")
 // so the client can point the user at what to fix. Returns nil when the
@@ -63,10 +79,7 @@ func validateBillInput(billType string, discount, shippingFee decimalLike, items
 			} else if utf8.RuneCountInString(name) > maxProductNameLength {
 				errs = append(errs, exception.ParameterError{FailedField: field + ".productName", Tag: fmt.Sprintf("max=%d", maxProductNameLength), Value: name})
 			}
-			if !models.IsValidPaymentItemUnit(item.Unit) {
-				errs = append(errs, exception.ParameterError{FailedField: field + ".unit", Tag: "oneof=" + strings.Join(models.PaymentItemUnits, " "), Value: item.Unit})
-			}
-			unit = item.Unit
+			unit = itemUnit(billType, item, nil)
 		} else {
 			product, ok := products[item.ProductID]
 			if !ok {
@@ -77,7 +90,13 @@ func validateBillInput(billType string, discount, shippingFee decimalLike, items
 				errs = append(errs, exception.ParameterError{FailedField: field + ".productId", Tag: "billScope=all", Value: fmt.Sprintf("%d", item.ProductID)})
 				continue
 			}
-			unit = product.Unit
+			unit = itemUnit(billType, item, &product)
+		}
+
+		if unit == "" {
+			errs = append(errs, exception.ParameterError{FailedField: field + ".unit", Tag: "required", Value: ""})
+		} else if utf8.RuneCountInString(unit) > models.MaxUnitLength {
+			errs = append(errs, exception.ParameterError{FailedField: field + ".unit", Tag: fmt.Sprintf("max=%d", models.MaxUnitLength), Value: unit})
 		}
 
 		if !item.Quantity.IsPositive() {
