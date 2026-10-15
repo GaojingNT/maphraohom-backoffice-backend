@@ -220,7 +220,17 @@ definitions:
       slipUploadedAt:
         type: string
       slipUrl:
+        description: |-
+          SlipURL is the first of Slips' URLs (null when there are none) —
+          kept for clients from before a bill could carry several slips.
         type: string
+      slips:
+        description: |-
+          Slips are every slip in attach order — always an array, empty
+          when there are none.
+        items:
+          $ref: '#/definitions/responses.BillSlipResponse'
+        type: array
       storeAddress:
         type: string
       storeId:
@@ -253,6 +263,15 @@ definitions:
       subtotal:
         type: number
       unit:
+        type: string
+    type: object
+  responses.BillSlipResponse:
+    properties:
+      id:
+        type: integer
+      uploadedAt:
+        type: string
+      url:
         type: string
     type: object
   responses.CustomerAddressItem:
@@ -938,8 +957,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get bill by id — every bills column except deleted_at, plus a ready-to-use
-        slipUrl
+      description: Get bill by id — every bills column except deleted_at, plus ready-to-use
+        slip URLs (slips, and slipUrl = the first)
       parameters:
       - description: bill id
         in: path
@@ -1010,15 +1029,62 @@ paths:
       summary: Update bill
       tags:
       - Bill Module (Version 1)
-  /api/v1/bills/{id}/slip:
-    delete:
+  /api/v1/bills/{id}/slips:
+    post:
       consumes:
-      - application/json
-      description: Clear a bill's slip and remove the underlying file (best-effort)
+      - multipart/form-data
+      description: Upload one slip image (jpeg/png/webp, checked by magic bytes, ≤
+        10MB) for an existing, non-deleted bill. A bill carries at most 5 slips —
+        send one request per image.
       parameters:
       - description: bill id
         in: path
         name: id
+        required: true
+        type: integer
+      - description: slip image
+        in: formData
+        name: slip
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/responses.BillSlipResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add a slip to a bill
+      tags:
+      - Bill Module (Version 1)
+  /api/v1/bills/{id}/slips/{slipId}:
+    delete:
+      consumes:
+      - application/json
+      description: Remove one slip from a bill and its underlying file (best-effort)
+      parameters:
+      - description: bill id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: slip id
+        in: path
+        name: slipId
         required: true
         type: integer
       produces:
@@ -1039,49 +1105,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Delete a bill's slip
-      tags:
-      - Bill Module (Version 1)
-    put:
-      consumes:
-      - multipart/form-data
-      description: Upload a slip image (jpeg/png/webp, checked by magic bytes, ≤ 10MB)
-        for an existing, non-deleted bill. Replaces any existing slip.
-      parameters:
-      - description: bill id
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: slip image
-        in: formData
-        name: slip
-        required: true
-        type: file
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            properties:
-              slipUrl:
-                type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/exception.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/exception.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/exception.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Upload a bill's slip
       tags:
       - Bill Module (Version 1)
   /api/v1/customers:

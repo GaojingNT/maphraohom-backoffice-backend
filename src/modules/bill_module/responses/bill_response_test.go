@@ -69,3 +69,29 @@ func TestBillDetailResponse_AuditFieldsSet(t *testing.T) {
 		t.Errorf("slipUploadedAt = %s", got)
 	}
 }
+
+// slips is always an array (never null), in the order loaded, with
+// ready-to-use URLs; slipUrl stays the first one's for older clients.
+func TestBillDetailResponse_Slips(t *testing.T) {
+	if got := string(makeJSON(t, models.Bill{})["slips"]); got != "[]" {
+		t.Errorf("slips with none = %s, want []", got)
+	}
+
+	uploaded := time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)
+	first := "slip/a.png"
+	out := makeJSON(t, models.Bill{
+		Slip: &first,
+		Slips: []models.BillSlip{
+			{BaseModel: models.BaseModel{ID: 4, BaseTimestampModel: models.BaseTimestampModel{CreatedAt: uploaded}}, ObjectKey: "slip/a.png"},
+			{BaseModel: models.BaseModel{ID: 9, BaseTimestampModel: models.BaseTimestampModel{CreatedAt: uploaded}}, ObjectKey: "slip/b.png"},
+		},
+	})
+
+	want := `[{"id":4,"url":"/api/v1/files/slip/a.png","uploadedAt":"2026-10-03T09:00:00Z"},{"id":9,"url":"/api/v1/files/slip/b.png","uploadedAt":"2026-10-03T09:00:00Z"}]`
+	if got := string(out["slips"]); got != want {
+		t.Errorf("slips = %s, want %s", got, want)
+	}
+	if got := string(out["slipUrl"]); got != `"/api/v1/files/slip/a.png"` {
+		t.Errorf("slipUrl = %s", got)
+	}
+}

@@ -209,29 +209,34 @@ func (s Service) DeleteBill(ctx context.Context, id int) error {
 	return err
 }
 
-// UploadSlip validates (magic bytes + size), uploads, and attaches a slip to
-// an existing bill. On a DB failure after a successful upload, the newly
-// uploaded object is removed. On success, any previous slip object is
-// removed best-effort (logged, never fails the request).
-func (s Service) UploadSlip(ctx context.Context, id int, file *multipart.FileHeader) (string, error) {
-	ctx, childSpan := s.tracer.TraceStart(ctx, "UploadSlipService", trace.WithAttributes(attribute.String("service", "UploadSlip"), attribute.Int("id", id)))
+// AddSlip validates (magic bytes + size), uploads, and attaches one more
+// slip to an existing bill — at most models.MaxSlipsPerBill per bill. On a
+// DB failure after a successful upload, the newly uploaded object is
+// removed. uploadedBy is the logged-in user's id.
+func (s Service) AddSlip(ctx context.Context, billID int, file *multipart.FileHeader, uploadedBy int) (*responses.BillSlipResponse, error) {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "AddSlipService", trace.WithAttributes(attribute.String("service", "AddSlip"), attribute.Int("id", billID)))
 	defer s.tracer.TraceEnd(childSpan)
 
-	oldKey, err := s.billRepository().GetBillSlipKey(ctx, id)
+	// Checked before uploading so a full bill doesn't cost an upload and
+	// a rollback delete; AddBillSlip re-checks under the bill's row lock.
+	count, err := s.billRepository().CountBillSlips(ctx, billID)
 	if err != nil {
-		return "", err
+		return nil, err
+	}
+	if count >= models.MaxSlipsPerBill {
+		return nil, exception.ErrTooManySlips
 	}
 
 	if file.Size > imagevalidate.MaxFileSize {
-		return "", exception.ErrSlipFileTooLarge
+		return nil, exception.ErrSlipFileTooLarge
 	}
 
 	ext, err := imagevalidate.DetectExtension(file)
 	if err != nil {
 		if errors.Is(err, imagevalidate.ErrUnsupported) {
-			return "", exception.ErrUnsupportedSlipType
+			return nil, exception.ErrUnsupportedSlipType
 		}
-		return "", err
+		return nil, err
 	}
 
 	folder := fmt.Sprintf("%s/%s", billSlipPath, time.Now().Format("2006-01-02"))
@@ -239,47 +244,34 @@ func (s Service) UploadSlip(ctx context.Context, id int, file *multipart.FileHea
 	key := fmt.Sprintf("%s/%s", folder, fileName)
 
 	if err := s.fileSystem.Put(ctx, folder, fileName, file); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if err := s.billRepository().UpdateBillSlip(ctx, id, &key); err != nil {
+	slip, err := s.billRepository().AddBillSlip(ctx, billID, key, &uploadedBy)
+	if err != nil {
 		// Roll back the upload — best-effort, log-only on failure.
-		_ = s.fileSystem.Delete(ctx, key)
-		return "", err
-	}
-
-	if oldKey != nil && *oldKey != "" && *oldKey != key {
-		// Best-effort: a leftover orphaned object is a cleanup nuisance, not
-		// a correctness problem, so a failure here must not fail the request.
-		if delErr := s.fileSystem.Delete(ctx, *oldKey); delErr != nil {
-			s.log.Error(fmt.Sprintf("[BillModule] failed to delete old slip object %q: %v", *oldKey, delErr))
+		if delErr := s.fileSystem.Delete(ctx, key); delErr != nil {
+			s.log.Error(fmt.Sprintf("[BillModule] failed to roll back slip object %q: %v", key, delErr))
 		}
+		return nil, err
 	}
 
-	return responses.SlipURLBuilder(key), nil
+	return responses.MakeBillSlipResponse(slip), nil
 }
 
-// DeleteSlip clears a bill's slip, then best-effort removes the underlying
-// object. A bill with no slip is left as-is (idempotent).
-func (s Service) DeleteSlip(ctx context.Context, id int) error {
-	ctx, childSpan := s.tracer.TraceStart(ctx, "DeleteSlipService", trace.WithAttributes(attribute.String("service", "DeleteSlip"), attribute.Int("id", id)))
+// DeleteSlip removes one of a bill's slips, then best-effort removes the
+// underlying object (logged, never fails the request).
+func (s Service) DeleteSlip(ctx context.Context, billID int, slipID int) error {
+	ctx, childSpan := s.tracer.TraceStart(ctx, "DeleteSlipService", trace.WithAttributes(attribute.String("service", "DeleteSlip"), attribute.Int("id", billID), attribute.Int("slipId", slipID)))
 	defer s.tracer.TraceEnd(childSpan)
 
-	oldKey, err := s.billRepository().GetBillSlipKey(ctx, id)
+	key, err := s.billRepository().DeleteBillSlip(ctx, billID, slipID)
 	if err != nil {
 		return err
 	}
 
-	if oldKey == nil || *oldKey == "" {
-		return nil
-	}
-
-	if err := s.billRepository().UpdateBillSlip(ctx, id, nil); err != nil {
-		return err
-	}
-
-	if delErr := s.fileSystem.Delete(ctx, *oldKey); delErr != nil {
-		s.log.Error(fmt.Sprintf("[BillModule] failed to delete slip object %q: %v", *oldKey, delErr))
+	if delErr := s.fileSystem.Delete(ctx, key); delErr != nil {
+		s.log.Error(fmt.Sprintf("[BillModule] failed to delete slip object %q: %v", key, delErr))
 	}
 
 	return nil

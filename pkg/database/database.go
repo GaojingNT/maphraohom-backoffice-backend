@@ -144,7 +144,17 @@ func AutoMigrate(dbConn *gorm.DB) {
 		models.BillSequence{},
 		models.Bill{},
 		models.BillItem{},
+		models.BillSlip{},
 	); err != nil {
+		log.Fatal(err)
+	}
+
+	// Carry each bill's pre-multi-slip bills.slip over into tbl_bill_slips
+	// before the app serves a request (same statement as migration 000004).
+	// Idempotent: a bill whose bills.slip already has a matching row is
+	// skipped, and bills.slip is kept in sync with tbl_bill_slips from then
+	// on, so this is a no-op on every later start.
+	if err := dbConn.Exec(BackfillBillSlipsSQL).Error; err != nil {
 		log.Fatal(err)
 	}
 
