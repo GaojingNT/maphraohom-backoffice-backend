@@ -642,7 +642,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get bill by id — every bills column except deleted_at, plus a ready-to-use slipUrl",
+                "description": "Get bill by id — every bills column except deleted_at, plus ready-to-use slip URLs (slips, and slipUrl = the first)",
                 "consumes": [
                     "application/json"
                 ],
@@ -793,14 +793,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/bills/{id}/slip": {
-            "put": {
+        "/api/v1/bills/{id}/slips": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Upload a slip image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing, non-deleted bill. Replaces any existing slip.",
+                "description": "Upload one slip image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing, non-deleted bill. A bill carries at most 5 slips — send one request per image.",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -810,7 +810,7 @@ const docTemplate = `{
                 "tags": [
                     "Bill Module (Version 1)"
                 ],
-                "summary": "Upload a bill's slip",
+                "summary": "Add a slip to a bill",
                 "parameters": [
                     {
                         "type": "integer",
@@ -828,15 +828,10 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "201": {
+                        "description": "Created",
                         "schema": {
-                            "type": "object",
-                            "properties": {
-                                "slipUrl": {
-                                    "type": "string"
-                                }
-                            }
+                            "$ref": "#/definitions/responses.BillSlipResponse"
                         }
                     },
                     "400": {
@@ -858,14 +853,16 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
+            }
+        },
+        "/api/v1/bills/{id}/slips/{slipId}": {
             "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Clear a bill's slip and remove the underlying file (best-effort)",
+                "description": "Remove one slip from a bill and its underlying file (best-effort)",
                 "consumes": [
                     "application/json"
                 ],
@@ -881,6 +878,13 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "bill id",
                         "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "slip id",
+                        "name": "slipId",
                         "in": "path",
                         "required": true
                     }
@@ -2338,7 +2342,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "slipUrl": {
+                    "description": "SlipURL is the first of Slips' URLs (null when there are none) —\nkept for clients from before a bill could carry several slips.",
                     "type": "string"
+                },
+                "slips": {
+                    "description": "Slips are every slip in attach order — always an array, empty\nwhen there are none.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/responses.BillSlipResponse"
+                    }
                 },
                 "storeAddress": {
                     "type": "string"
@@ -2388,6 +2400,20 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "unit": {
+                    "type": "string"
+                }
+            }
+        },
+        "responses.BillSlipResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "uploadedAt": {
+                    "type": "string"
+                },
+                "url": {
                     "type": "string"
                 }
             }

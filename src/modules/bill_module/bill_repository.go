@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
 	"maphraohom.app/maphraohom-backoffice/internal/utils"
 	"maphraohom.app/maphraohom-backoffice/pkg/database/paginator"
@@ -303,13 +304,16 @@ func nextBillNumbers(tx *gorm.DB, storeID int, billType string) (bookNo int, rec
 }
 
 // preloadBillDetail loads everything responses.BillDetailResponse.Make
-// reads: the store, each item's product, and the creator's name — only
-// id/first_name/last_name, so email, password hash and signature never
-// leave the users table.
+// reads: the store, each item's product, the slips (in attach order), and
+// the creator's name — only id/first_name/last_name, so email, password
+// hash and signature never leave the users table.
 func preloadBillDetail(db *gorm.DB) *gorm.DB {
 	return db.
 		Preload("Store").
 		Preload("Items.Product").
+		Preload("Slips", func(db *gorm.DB) *gorm.DB {
+			return db.Order("id")
+		}).
 		Preload("Creator", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id", "first_name", "last_name")
 		})
@@ -356,18 +360,49 @@ func applyBillUpdate(bill *models.Bill, input UpdateBillInput, customerID int, n
 	bill.EditedAt = &now
 }
 
-// setBillSlip sets (key non-nil) or clears (key nil) a bill's slip together
-// with slip_uploaded_at. edited_at is not touched — a slip change is not an
-// edit of the bill.
-func setBillSlip(db *gorm.DB, id int, key *string, now time.Time) error {
-	var uploadedAt *time.Time
-	if key != nil {
-		uploadedAt = &now
+// billSlipMirror is what tbl_bills.slip/slip_uploaded_at hold for a bill
+// with these slips (in id order): the first slip's key and the most recent
+// attach time, or nil/nil when there are none.
+func billSlipMirror(slips []models.BillSlip) (*string, *time.Time) {
+	if len(slips) == 0 {
+		return nil, nil
 	}
-	return db.Model(&models.Bill{}).Where("id = ?", id).Updates(map[string]any{
+	key := slips[0].ObjectKey
+	latest := slips[0].CreatedAt
+	for _, slip := range slips[1:] {
+		if slip.CreatedAt.After(latest) {
+			latest = slip.CreatedAt
+		}
+	}
+	return &key, &latest
+}
+
+// syncBillSlipMirror re-derives tbl_bills.slip/slip_uploaded_at from the
+// bill's current tbl_bill_slips rows — run in the same transaction as every
+// slip change. edited_at is not touched: a slip change is not an edit of
+// the bill.
+func syncBillSlipMirror(tx *gorm.DB, billID int) error {
+	var slips []models.BillSlip
+	if err := tx.Where("bill_id = ?", billID).Order("id").Find(&slips).Error; err != nil {
+		return err
+	}
+	key, uploadedAt := billSlipMirror(slips)
+	return tx.Model(&models.Bill{}).Where("id = ?", billID).Updates(map[string]any{
 		"slip":             key,
 		"slip_uploaded_at": uploadedAt,
 	}).Error
+}
+
+// lockBill takes a row lock on a (non-deleted) bill for the rest of the
+// transaction, so concurrent slip uploads to the same bill are serialized
+// and can't push it past models.MaxSlipsPerBill together.
+func lockBill(tx *gorm.DB, billID int) error {
+	var bill models.Bill
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id").First(&bill, billID).Error
+	if err == gorm.ErrRecordNotFound {
+		return exception.ErrRecordNotFound
+	}
+	return err
 }
 
 func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (models.Bill, error) {
@@ -508,7 +543,10 @@ func (r Repository) UpdateBill(ctx context.Context, id int, input UpdateBillInpu
 
 				applyBillUpdate(&bill, input, customerID, time.Now())
 
-				if txErr := tx.Save(&bill).Error; txErr != nil {
+				// The slip columns are owned by the slip endpoints — omit
+				// them so a concurrent slip change isn't overwritten with
+				// the values loaded above.
+				if txErr := tx.Omit("slip", "slip_uploaded_at", "Slips").Save(&bill).Error; txErr != nil {
 					return txErr
 				}
 
@@ -701,18 +739,22 @@ func (r Repository) DeleteBill(ctx context.Context, id int) error {
 	return err
 }
 
-// GetBillSlipKey returns the bill's current slip object key (nil if none)
-// after checking the bill exists and hasn't been soft-deleted.
-func (r Repository) GetBillSlipKey(ctx context.Context, id int) (*string, error) {
+// CountBillSlips returns how many slips a bill has, after checking the bill
+// exists and hasn't been soft-deleted.
+func (r Repository) CountBillSlips(ctx context.Context, billID int) (int, error) {
 	var (
-		_, childSpan = r.tracer.TraceStart(ctx, "GetBillSlipKeyRepository", trace.WithAttributes(attribute.String("repository", "GetBillSlipKey"), attribute.Int64("id", int64(id))))
+		_, childSpan = r.tracer.TraceStart(ctx, "CountBillSlipsRepository", trace.WithAttributes(attribute.String("repository", "CountBillSlips"), attribute.Int64("id", int64(billID))))
 		bill         models.Bill
+		count        int64
 		err          error
 	)
 
 	utils.Block{
 		Try: func() {
-			if err = r.db.Select("id", "slip").First(&bill, id).Error; err != nil {
+			if err = r.db.Select("id").First(&bill, billID).Error; err != nil {
+				utils.Throw(err)
+			}
+			if err = r.db.Model(&models.BillSlip{}).Where("bill_id = ?", billID).Count(&count).Error; err != nil {
 				utils.Throw(err)
 			}
 		},
@@ -733,37 +775,122 @@ func (r Repository) GetBillSlipKey(ctx context.Context, id int) (*string, error)
 	r.tracer.TraceEnd(childSpan)
 
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	return bill.Slip, nil
+	return int(count), nil
 }
 
-// UpdateBillSlip sets (or clears, when key is nil) a bill's slip object key
-// and its slip_uploaded_at — see setBillSlip.
-func (r Repository) UpdateBillSlip(ctx context.Context, id int, key *string) error {
+// AddBillSlip attaches an already-uploaded object to a bill and re-syncs
+// the bill's slip mirror. Returns exception.ErrTooManySlips when the bill
+// already has models.MaxSlipsPerBill slips — checked under the bill's row
+// lock, so concurrent uploads can't both slip past it.
+func (r Repository) AddBillSlip(ctx context.Context, billID int, key string, uploadedBy *int) (models.BillSlip, error) {
 	var (
-		_, childSpan = r.tracer.TraceStart(ctx, "UpdateBillSlipRepository", trace.WithAttributes(attribute.String("repository", "UpdateBillSlip"), attribute.Int64("id", int64(id))))
+		_, childSpan = r.tracer.TraceStart(ctx, "AddBillSlipRepository", trace.WithAttributes(attribute.String("repository", "AddBillSlip"), attribute.Int64("id", int64(billID))))
+		slip         models.BillSlip
 		err          error
 	)
 
 	utils.Block{
 		Try: func() {
-			if err = setBillSlip(r.db, id, key, time.Now()); err != nil {
+			if err = r.db.Transaction(func(tx *gorm.DB) error {
+				if txErr := lockBill(tx, billID); txErr != nil {
+					return txErr
+				}
+
+				var count int64
+				if txErr := tx.Model(&models.BillSlip{}).Where("bill_id = ?", billID).Count(&count).Error; txErr != nil {
+					return txErr
+				}
+				if count >= models.MaxSlipsPerBill {
+					return exception.ErrTooManySlips
+				}
+
+				slip = models.BillSlip{BillID: billID, ObjectKey: key, UploadedBy: uploadedBy}
+				if txErr := tx.Create(&slip).Error; txErr != nil {
+					return txErr
+				}
+
+				return syncBillSlipMirror(tx, billID)
+			}); err != nil {
 				utils.Throw(err)
 			}
 		},
 		Catch: func(e utils.Exception) {
-			err = e.(error)
-			r.logger.Error(err.Error())
-			sentry.CaptureException(err)
-			exception.SqlErrorMessage = err.Error()
-			err = exception.ErrDbQueryStatement
+			switch e {
+			case exception.ErrRecordNotFound:
+				err = exception.ErrRecordNotFound
+			case exception.ErrTooManySlips:
+				err = exception.ErrTooManySlips
+			default:
+				err = e.(error)
+				r.logger.Error(err.Error())
+				sentry.CaptureException(err)
+				exception.SqlErrorMessage = err.Error()
+				err = exception.ErrDbQueryStatement
+			}
 		},
 		Finally: nil,
 	}.Do()
 
 	r.tracer.TraceEnd(childSpan)
 
-	return err
+	return slip, err
+}
+
+// DeleteBillSlip removes one of a bill's slips and re-syncs the bill's slip
+// mirror, returning the removed slip's object key so the caller can delete
+// the file. A slip id that doesn't belong to this bill is ErrRecordNotFound.
+func (r Repository) DeleteBillSlip(ctx context.Context, billID int, slipID int) (string, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "DeleteBillSlipRepository", trace.WithAttributes(attribute.String("repository", "DeleteBillSlip"), attribute.Int64("id", int64(billID)), attribute.Int64("slipId", int64(slipID))))
+		slip         models.BillSlip
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Transaction(func(tx *gorm.DB) error {
+				if txErr := lockBill(tx, billID); txErr != nil {
+					return txErr
+				}
+
+				if txErr := tx.Where("id = ? AND bill_id = ?", slipID, billID).First(&slip).Error; txErr != nil {
+					if txErr == gorm.ErrRecordNotFound {
+						return exception.ErrRecordNotFound
+					}
+					return txErr
+				}
+				if txErr := tx.Delete(&slip).Error; txErr != nil {
+					return txErr
+				}
+
+				return syncBillSlipMirror(tx, billID)
+			}); err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			switch e {
+			case exception.ErrRecordNotFound:
+				err = exception.ErrRecordNotFound
+			default:
+				err = e.(error)
+				r.logger.Error(err.Error())
+				sentry.CaptureException(err)
+				exception.SqlErrorMessage = err.Error()
+				err = exception.ErrDbQueryStatement
+			}
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return "", err
+	}
+
+	return slip.ObjectKey, nil
 }

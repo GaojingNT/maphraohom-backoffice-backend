@@ -61,9 +61,14 @@ type Bill struct {
 	// positive; the direction of money is read from Type.
 	Total decimal.Decimal `json:"total" gorm:"column:total;type:numeric(12,2);not null;"`
 
-	// Slip is the MinIO object key only — never a full URL. Nil means no
-	// slip has been attached yet; it is set/cleared only through the
-	// dedicated slip endpoints, never by POST/PUT /bills.
+	// Slips are the bill's slip images (tbl_bill_slips), added/removed only
+	// through the dedicated slip endpoints, never by POST/PUT /bills.
+	Slips []BillSlip `json:"slips,omitempty" gorm:"foreignKey:BillID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+
+	// Slip mirrors the first of Slips' object keys (nil when there are
+	// none) — the column from before a bill could carry several slips. Kept
+	// in sync in the same transaction as every slip change, so the list
+	// page's hasSlip needs no join and an older build still sees a slip.
 	Slip *string `json:"slip" gorm:"column:slip;size:255;"`
 
 	// Audit fields. updated_at can't answer "when was this bill edited" —
@@ -78,8 +83,8 @@ type Bill struct {
 	Creator   *User `json:"-" gorm:"foreignKey:CreatedBy;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	// EditedAt is set by PUT /bills/:id only.
 	EditedAt *time.Time `json:"editedAt" gorm:"column:edited_at;null;"`
-	// SlipUploadedAt is set when a slip is attached or replaced and cleared
-	// when it's removed — always together with Slip.
+	// SlipUploadedAt is when the most recent of Slips was attached, nil
+	// when there are none — always kept in sync together with Slip.
 	SlipUploadedAt *time.Time `json:"slipUploadedAt" gorm:"column:slip_uploaded_at;null;"`
 
 	// Soft delete

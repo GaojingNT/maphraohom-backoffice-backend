@@ -87,7 +87,7 @@ func (c Controller) GetBills(f *fiber.Ctx) error {
 // GetBill get existing bill by ID
 //
 //	@Summary		Get bill
-//	@Description	Get bill by id — every bills column except deleted_at, plus a ready-to-use slipUrl
+//	@Description	Get bill by id — every bills column except deleted_at, plus ready-to-use slip URLs (slips, and slipUrl = the first)
 //	@Tags			Bill Module (Version 1)
 //	@Accept			json
 //	@Produce		json
@@ -241,25 +241,25 @@ func (c Controller) DeleteBill(f *fiber.Ctx) error {
 	return http_response.HttpOkResponse(f, "OK", "Bill deleted successfully")
 }
 
-// UploadSlip attaches (or replaces) a bill's payment slip
+// AddSlip attaches one more slip image to a bill
 //
-//	@Summary		Upload a bill's slip
-//	@Description	Upload a slip image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing, non-deleted bill. Replaces any existing slip.
+//	@Summary		Add a slip to a bill
+//	@Description	Upload one slip image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing, non-deleted bill. A bill carries at most 5 slips — send one request per image.
 //	@Tags			Bill Module (Version 1)
 //	@Accept			mpfd
 //	@Produce		json
 //	@Param			id		path		int		true	"bill id"
 //	@Param			slip	formData	file	true	"slip image"
-//	@Success		200		{object}	object{slipUrl=string}
+//	@Success		201		{object}	responses.BillSlipResponse
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		404		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
 //	@Security		BearerAuth
-//	@Router			/api/v1/bills/{id}/slip [put]
-func (c Controller) UploadSlip(f *fiber.Ctx) error {
+//	@Router			/api/v1/bills/{id}/slips [post]
+func (c Controller) AddSlip(f *fiber.Ctx) error {
 	var (
 		id, _     = f.ParamsInt("id")
-		ctx, span = c.m.tracer.TraceStart(f.Context(), "UploadSlipController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "UploadSlip"), attribute.Int("id", id)))
+		ctx, span = c.m.tracer.TraceStart(f.Context(), "AddSlipController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "AddSlip"), attribute.Int("id", id)))
 	)
 
 	file, err := f.FormFile("slip")
@@ -271,11 +271,16 @@ func (c Controller) UploadSlip(f *fiber.Ctx) error {
 		})
 	}
 
-	slipURL, err := c.billService().UploadSlip(ctx, id, file)
+	// JwtAuthProtected guards every bill route, so authUser is always set.
+	authUser := f.Locals("authUser").(*models.User)
+
+	responseData, err := c.billService().AddSlip(ctx, id, file, authUser.ID)
 	if err != nil {
 		switch err {
 		case exception.ErrRecordNotFound:
 			return exception.HttpErrorResponseMapping(f, fiber.StatusNotFound, exception.RecordNotFoundResponseError, err)
+		case exception.ErrTooManySlips:
+			return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.TooManySlipsResponseError, err)
 		case exception.ErrUnsupportedSlipType:
 			return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.UnsupportedSlipTypeResponseError, err)
 		case exception.ErrSlipFileTooLarge:
@@ -286,29 +291,31 @@ func (c Controller) UploadSlip(f *fiber.Ctx) error {
 	}
 
 	c.m.tracer.TraceEnd(span)
-	return f.Status(fiber.StatusOK).JSON(fiber.Map{"slipUrl": slipURL})
+	return f.Status(fiber.StatusCreated).JSON(responseData)
 }
 
-// DeleteSlip removes a bill's slip
+// DeleteSlip removes one of a bill's slips
 //
 //	@Summary		Delete a bill's slip
-//	@Description	Clear a bill's slip and remove the underlying file (best-effort)
+//	@Description	Remove one slip from a bill and its underlying file (best-effort)
 //	@Tags			Bill Module (Version 1)
 //	@Accept			json
 //	@Produce		json
-//	@Param			id	path		int	true	"bill id"
-//	@Success		200	{object}	http_response.OkResponse
-//	@Failure		404	{object}	exception.ErrorResponse
-//	@Failure		500	{object}	exception.ErrorResponse
+//	@Param			id		path		int	true	"bill id"
+//	@Param			slipId	path		int	true	"slip id"
+//	@Success		200		{object}	http_response.OkResponse
+//	@Failure		404		{object}	exception.ErrorResponse
+//	@Failure		500		{object}	exception.ErrorResponse
 //	@Security		BearerAuth
-//	@Router			/api/v1/bills/{id}/slip [delete]
+//	@Router			/api/v1/bills/{id}/slips/{slipId} [delete]
 func (c Controller) DeleteSlip(f *fiber.Ctx) error {
 	var (
 		id, _     = f.ParamsInt("id")
-		ctx, span = c.m.tracer.TraceStart(f.Context(), "DeleteSlipController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "DeleteSlip"), attribute.Int("id", id)))
+		slipID, _ = f.ParamsInt("slipId")
+		ctx, span = c.m.tracer.TraceStart(f.Context(), "DeleteSlipController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "DeleteSlip"), attribute.Int("id", id), attribute.Int("slipId", slipID)))
 	)
 
-	if err := c.billService().DeleteSlip(ctx, id); err != nil {
+	if err := c.billService().DeleteSlip(ctx, id, slipID); err != nil {
 		if err == exception.ErrRecordNotFound {
 			return exception.HttpErrorResponseMapping(f, fiber.StatusNotFound, exception.RecordNotFoundResponseError, err)
 		}

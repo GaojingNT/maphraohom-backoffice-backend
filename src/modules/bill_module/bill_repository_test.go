@@ -1,7 +1,6 @@
 package bill_module
 
 import (
-	"database/sql/driver"
 	"regexp"
 	"testing"
 	"time"
@@ -148,45 +147,74 @@ func TestApplyBillUpdate_StampsEditedAt(t *testing.T) {
 // app's tbl_ naming strategy.
 var setBillSlipQuery = `UPDATE "(tbl_)?bills" ` + regexp.QuoteMeta(`SET "slip"=$1,"slip_uploaded_at"=$2,"updated_at"=$3 WHERE id = $4`)
 
-// nonNilTime matches any non-nil time.Time argument.
-type nonNilTime struct{}
+var selectBillSlipsQuery = `SELECT \* FROM "(tbl_)?bill_slips" ` + regexp.QuoteMeta(`WHERE bill_id = $1 ORDER BY id`)
 
-func (nonNilTime) Match(v driver.Value) bool {
-	_, ok := v.(time.Time)
-	return ok
+// The mirror is the first slip's key plus the most recent attach time —
+// not necessarily the first slip's.
+func TestBillSlipMirror_FirstKeyLatestTime(t *testing.T) {
+	first := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
+	latest := time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)
+	slips := []models.BillSlip{
+		{BaseModel: models.BaseModel{ID: 1, BaseTimestampModel: models.BaseTimestampModel{CreatedAt: first}}, ObjectKey: "slip/a.png"},
+		{BaseModel: models.BaseModel{ID: 2, BaseTimestampModel: models.BaseTimestampModel{CreatedAt: latest}}, ObjectKey: "slip/b.png"},
+		{BaseModel: models.BaseModel{ID: 3, BaseTimestampModel: models.BaseTimestampModel{CreatedAt: first}}, ObjectKey: "slip/c.png"},
+	}
+
+	key, uploadedAt := billSlipMirror(slips)
+
+	if key == nil || *key != "slip/a.png" {
+		t.Errorf("key = %v, want slip/a.png", key)
+	}
+	if uploadedAt == nil || !uploadedAt.Equal(latest) {
+		t.Errorf("uploadedAt = %v, want %v", uploadedAt, latest)
+	}
 }
 
-// (c)+(d) Attaching a slip sets slip_uploaded_at, not edited_at.
-func TestSetBillSlip_AttachStampsSlipUploadedAt(t *testing.T) {
-	gormDB, mock := newMockGormDB(t)
-	key := "bills/slips/a.png"
+func TestBillSlipMirror_NoSlips(t *testing.T) {
+	key, uploadedAt := billSlipMirror(nil)
+	if key != nil || uploadedAt != nil {
+		t.Errorf("mirror = %v, %v, want nil, nil", key, uploadedAt)
+	}
+}
 
+// (c)+(d) With slips left, the mirror is written from them — never edited_at.
+func TestSyncBillSlipMirror_WritesFirstSlip(t *testing.T) {
+	gormDB, mock := newMockGormDB(t)
+	uploaded := time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)
+
+	mock.ExpectQuery(selectBillSlipsQuery).
+		WithArgs(5).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "bill_id", "object_key", "created_at"}).
+			AddRow(1, 5, "slip/a.png", uploaded))
 	mock.ExpectBegin()
 	mock.ExpectExec(setBillSlipQuery).
-		WithArgs(key, nonNilTime{}, sqlmock.AnyArg(), 5).
+		WithArgs("slip/a.png", uploaded, sqlmock.AnyArg(), 5).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	if err := setBillSlip(gormDB, 5, &key, time.Now()); err != nil {
-		t.Fatalf("setBillSlip returned error: %v", err)
+	if err := syncBillSlipMirror(gormDB, 5); err != nil {
+		t.Fatalf("syncBillSlipMirror returned error: %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
 
-// (c) Removing the slip clears slip_uploaded_at back to NULL.
-func TestSetBillSlip_RemoveClearsSlipUploadedAt(t *testing.T) {
+// (c) Removing the last slip clears slip and slip_uploaded_at back to NULL.
+func TestSyncBillSlipMirror_NoSlipsClears(t *testing.T) {
 	gormDB, mock := newMockGormDB(t)
 
+	mock.ExpectQuery(selectBillSlipsQuery).
+		WithArgs(5).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "bill_id", "object_key", "created_at"}))
 	mock.ExpectBegin()
 	mock.ExpectExec(setBillSlipQuery).
 		WithArgs(nil, nil, sqlmock.AnyArg(), 5).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	if err := setBillSlip(gormDB, 5, nil, time.Now()); err != nil {
-		t.Fatalf("setBillSlip returned error: %v", err)
+	if err := syncBillSlipMirror(gormDB, 5); err != nil {
+		t.Fatalf("syncBillSlipMirror returned error: %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)

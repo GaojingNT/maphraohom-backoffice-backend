@@ -24,6 +24,7 @@ var (
 	ErrBillFieldImmutable  = eris.New("storeId and type cannot be changed on an existing bill")
 	ErrUnsupportedSlipType = eris.New("slip file type not supported (jpeg, png, webp only)")
 	ErrSlipFileTooLarge    = eris.New("slip file exceeds the 10MB size limit")
+	ErrTooManySlips        = eris.New("a bill can carry at most 5 slips")
 	// Store errors
 	ErrUnsupportedImageType = eris.New("image file type not supported (jpeg, png, webp only)")
 	ErrImageFileTooLarge    = eris.New("image file exceeds the 10MB size limit")
@@ -55,6 +56,7 @@ var (
 	BillFieldImmutableResponseError  = &ErrorResponse{Code: "BILL-1002", Message: "storeId and type cannot be changed on an existing bill"}
 	UnsupportedSlipTypeResponseError = &ErrorResponse{Code: "BILL-1003", Message: "slip file type not supported (jpeg, png, webp only)"}
 	SlipFileTooLargeResponseError    = &ErrorResponse{Code: "BILL-1004", Message: "slip file exceeds the 10MB size limit"}
+	TooManySlipsResponseError        = &ErrorResponse{Code: "BILL-1005", Message: "a bill can carry at most 5 slips"}
 	// Store error response messages
 	UnsupportedImageTypeResponseError = &ErrorResponse{Code: "STORE-1001", Message: "image file type not supported (jpeg, png, webp only)"}
 	ImageFileTooLargeResponseError    = &ErrorResponse{Code: "STORE-1002", Message: "image file exceeds the 10MB size limit"}

@@ -38,8 +38,8 @@ type (
 
 	// BillDetailResponse is the shape returned by GET /bills/:id — every
 	// bills table column except deleted_at, plus the issuing store's
-	// printable profile (name/logo/address/phone), a ready-to-use
-	// slip URL, and its line items (with each item's product name).
+	// printable profile (name/logo/address/phone), the slips with
+	// ready-to-use URLs, and its line items (with each item's product name).
 	BillDetailResponse struct {
 		ID              int             `json:"id"`
 		Type            string          `json:"type"`
@@ -57,9 +57,14 @@ type (
 		Discount        decimal.Decimal `json:"discount"`
 		ShippingFee     decimal.Decimal `json:"shippingFee"`
 		Total           decimal.Decimal `json:"total"`
-		SlipURL         *string         `json:"slipUrl"`
-		CreatedAt       string          `json:"createdAt"`
-		UpdatedAt       string          `json:"updatedAt"`
+		// SlipURL is the first of Slips' URLs (null when there are none) —
+		// kept for clients from before a bill could carry several slips.
+		SlipURL *string `json:"slipUrl"`
+		// Slips are every slip in attach order — always an array, empty
+		// when there are none.
+		Slips     []BillSlipResponse `json:"slips"`
+		CreatedAt string             `json:"createdAt"`
+		UpdatedAt string             `json:"updatedAt"`
 		// Audit fields — each is JSON null (never omitted, never a zero
 		// time) when unknown: createdBy for bills from before it was
 		// recorded, editedAt when never edited via PUT /bills/:id,
@@ -68,6 +73,13 @@ type (
 		EditedAt       *time.Time           `json:"editedAt"`
 		SlipUploadedAt *time.Time           `json:"slipUploadedAt"`
 		Items          []BillItemDetail     `json:"items"`
+	}
+
+	// BillSlipResponse is one of a bill's slips.
+	BillSlipResponse struct {
+		ID         int       `json:"id"`
+		URL        string    `json:"url"`
+		UploadedAt time.Time `json:"uploadedAt"`
 	}
 
 	// BillCreatorResponse is who created a bill — name only, deliberately
@@ -86,6 +98,14 @@ type (
 // to storage directly.
 var SlipURLBuilder = func(key string) string {
 	return fmt.Sprintf("/api/v1/files/%s", key)
+}
+
+func MakeBillSlipResponse(slip models.BillSlip) *BillSlipResponse {
+	return &BillSlipResponse{
+		ID:         slip.ID,
+		URL:        SlipURLBuilder(slip.ObjectKey),
+		UploadedAt: slip.CreatedAt,
+	}
 }
 
 func (BillListItem) Collection(bills []models.Bill) []BillListItem {
@@ -149,6 +169,11 @@ func (response *BillDetailResponse) Make(bill models.Bill) *BillDetailResponse {
 		slipURL = &url
 	}
 
+	slips := make([]BillSlipResponse, 0, len(bill.Slips))
+	for _, slip := range bill.Slips {
+		slips = append(slips, *MakeBillSlipResponse(slip))
+	}
+
 	var createdBy *BillCreatorResponse
 	if bill.Creator != nil {
 		createdBy = &BillCreatorResponse{
@@ -176,6 +201,7 @@ func (response *BillDetailResponse) Make(bill models.Bill) *BillDetailResponse {
 		ShippingFee:     bill.ShippingFee,
 		Total:           bill.Total,
 		SlipURL:         slipURL,
+		Slips:           slips,
 		CreatedAt:       bill.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt:       bill.UpdatedAt.Format("2006-01-02 15:04:05"),
 		CreatedBy:       createdBy,
