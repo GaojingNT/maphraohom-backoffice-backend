@@ -10,7 +10,7 @@ import (
 // GetProducts lists all existing products
 //
 //	@Summary		List products
-//	@Description	Get every product (id, name, unit)
+//	@Description	Get every product (id, name, unit, billScope). billScope "all" products can go on any bill; "payment" ones (typed in on payment bills) on payment bills only.
 //	@Tags			Product Module (Version 1)
 //	@Accept			json
 //	@Produce		json

@@ -2,6 +2,8 @@ package bill_module
 
 import (
 	"fmt"
+	"strings"
+	"unicode/utf8"
 
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
 	"maphraohom.app/maphraohom-backoffice/src/models"
@@ -11,12 +13,18 @@ import (
 // bottleUnit is the one unit that must be billed in whole numbers.
 const bottleUnit = "ขวด"
 
+// maxProductNameLength matches tbl_products.name's size.
+const maxProductNameLength = 255
+
 // validateBillInput checks every field shared by create and update requests
 // against business rules that need more than a struct tag: bill type
 // whitelist, non-negative discount/shipping fee, at least one item, and per
 // item quantity/price/product checks (including "ขวด" must be a whole
 // number). products maps a referenced productId to its catalog row; a
-// missing key means the id doesn't exist or was soft-deleted.
+// missing key means the id doesn't exist or was soft-deleted. A receipt bill
+// may only use ProductScopeAll products; a typed-in item (productId 0) is
+// allowed on a payment bill only, with a name and one of
+// models.PaymentItemUnits.
 //
 // Every error names the exact field/row it came from (e.g. "items[1].quantity")
 // so the client can point the user at what to fix. Returns nil when the
@@ -43,15 +51,38 @@ func validateBillInput(billType string, discount, shippingFee decimalLike, items
 	for i, item := range items {
 		field := fmt.Sprintf("items[%d]", i)
 
-		product, ok := products[item.ProductID]
-		if !ok {
-			errs = append(errs, exception.ParameterError{FailedField: field + ".productId", Tag: "exists", Value: fmt.Sprintf("%d", item.ProductID)})
-			continue
+		var unit string
+		if item.ProductID == 0 {
+			if billType != models.BillTypePayment {
+				errs = append(errs, exception.ParameterError{FailedField: field + ".productId", Tag: "required", Value: "0"})
+				continue
+			}
+			name := models.NormalizeProductName(item.ProductName)
+			if name == "" {
+				errs = append(errs, exception.ParameterError{FailedField: field + ".productName", Tag: "required", Value: ""})
+			} else if utf8.RuneCountInString(name) > maxProductNameLength {
+				errs = append(errs, exception.ParameterError{FailedField: field + ".productName", Tag: fmt.Sprintf("max=%d", maxProductNameLength), Value: name})
+			}
+			if !models.IsValidPaymentItemUnit(item.Unit) {
+				errs = append(errs, exception.ParameterError{FailedField: field + ".unit", Tag: "oneof=" + strings.Join(models.PaymentItemUnits, " "), Value: item.Unit})
+			}
+			unit = item.Unit
+		} else {
+			product, ok := products[item.ProductID]
+			if !ok {
+				errs = append(errs, exception.ParameterError{FailedField: field + ".productId", Tag: "exists", Value: fmt.Sprintf("%d", item.ProductID)})
+				continue
+			}
+			if billType == models.BillTypeReceipt && product.BillScope == models.ProductScopePayment {
+				errs = append(errs, exception.ParameterError{FailedField: field + ".productId", Tag: "billScope=all", Value: fmt.Sprintf("%d", item.ProductID)})
+				continue
+			}
+			unit = product.Unit
 		}
 
 		if !item.Quantity.IsPositive() {
 			errs = append(errs, exception.ParameterError{FailedField: field + ".quantity", Tag: "gt=0", Value: item.Quantity.String()})
-		} else if product.Unit == bottleUnit && !item.Quantity.IsInteger() {
+		} else if unit == bottleUnit && !item.Quantity.IsInteger() {
 			errs = append(errs, exception.ParameterError{FailedField: field + ".quantity", Tag: "integer", Value: item.Quantity.String()})
 		}
 
