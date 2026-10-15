@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"mime/multipart"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -52,12 +54,61 @@ func (s Service) GetBill(ctx context.Context, id int) (*responses.BillDetailResp
 	return new(responses.BillDetailResponse).Make(bill), nil
 }
 
-// resolveAndPriceItems validates dto-level item input against the product
-// catalog and returns the priced CreateBillItemInput slice plus its total
-// subtotal-sum decimal errs (if any) name the exact field/row that's wrong.
+// matchTypedItems points each typed-in item (productId 0) of a payment bill
+// at the existing product with the same name, if there is one, so picking
+// it from the list and typing it again end up the same. Names are
+// normalized (see models.NormalizeProductName) either way. Items still at
+// productId 0 afterwards are new products, created with the bill.
+func (s Service) matchTypedItems(ctx context.Context, billType string, items []dtos.CreateBillItem) ([]dtos.CreateBillItem, error) {
+	if billType != models.BillTypePayment {
+		return items, nil
+	}
+
+	matched := slices.Clone(items)
+	names := make([]string, 0)
+	for i := range matched {
+		if matched[i].ProductID == 0 {
+			matched[i].ProductName = models.NormalizeProductName(matched[i].ProductName)
+			if matched[i].ProductName != "" {
+				names = append(names, matched[i].ProductName)
+			}
+		}
+	}
+	if len(names) == 0 {
+		return matched, nil
+	}
+
+	byName, err := s.billRepository().GetProductsByName(ctx, names)
+	if err != nil {
+		return nil, err
+	}
+	for i := range matched {
+		if matched[i].ProductID != 0 {
+			continue
+		}
+		if product, ok := byName[strings.ToLower(matched[i].ProductName)]; ok {
+			matched[i].ProductID = product.ID
+		}
+	}
+	return matched, nil
+}
+
+// resolveAndPriceItems turns already-validated dto-level items into priced
+// CreateBillItemInput rows — the unit is the catalog product's, or the
+// picked one for a typed-in item (created by the repository).
 func (s Service) resolveAndPriceItems(ctx context.Context, items []dtos.CreateBillItem, products map[int]models.Product) []CreateBillItemInput {
 	priced := make([]CreateBillItemInput, 0, len(items))
 	for _, item := range items {
+		if item.ProductID == 0 {
+			priced = append(priced, CreateBillItemInput{
+				NewProductName: item.ProductName,
+				Unit:           item.Unit,
+				Quantity:       item.Quantity,
+				Price:          item.Price,
+				Subtotal:       computeSubtotal(item.Quantity, item.Price),
+			})
+			continue
+		}
 		product, ok := products[item.ProductID]
 		if !ok {
 			// Already reported by validateBillInput — skip so pricing
@@ -79,10 +130,15 @@ func (s Service) resolveAndPriceItems(ctx context.Context, items []dtos.CreateBi
 // rules, product/customer existence, and the total >= 0 rule), returning the
 // priced items and total on success, or the list of field errors otherwise.
 func (s Service) validateAndPrice(ctx context.Context, billType string, customerID *int, discount decimal.Decimal, shippingFee decimal.Decimal, items []dtos.CreateBillItem) ([]CreateBillItemInput, decimal.Decimal, []exception.ParameterError, error) {
+	items, err := s.matchTypedItems(ctx, billType, items)
+	if err != nil {
+		return nil, decimal.Zero, nil, err
+	}
+
 	productIDs := make([]int, 0, len(items))
 	seen := make(map[int]bool, len(items))
 	for _, item := range items {
-		if !seen[item.ProductID] {
+		if item.ProductID != 0 && !seen[item.ProductID] {
 			seen[item.ProductID] = true
 			productIDs = append(productIDs, item.ProductID)
 		}

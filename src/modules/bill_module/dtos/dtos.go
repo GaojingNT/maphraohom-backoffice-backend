@@ -8,12 +8,18 @@ import (
 
 // CreateBillItem is one line item of a create/update-bill request. Price is
 // entered by the user — there is no price list to look up. Server computes
-// Unit (from the product) and Subtotal; anything the client sends for those
-// is ignored.
+// Subtotal; anything the client sends for it is ignored.
+//
+// An item either picks a catalog product (ProductID) — its unit comes from
+// the product and Unit is ignored — or, on a payment bill only, is typed in
+// (ProductID 0, ProductName + Unit). A typed-in item is matched to the
+// existing product with that name, or saved as a new payment-only product.
 type CreateBillItem struct {
-	ProductID int             `json:"productId"`
-	Quantity  decimal.Decimal `json:"quantity"`
-	Price     decimal.Decimal `json:"price"`
+	ProductID   int             `json:"productId"`
+	ProductName string          `json:"productName,omitempty"`
+	Unit        string          `json:"unit,omitempty"`
+	Quantity    decimal.Decimal `json:"quantity"`
+	Price       decimal.Decimal `json:"price"`
 }
 
 // CreateBill is the JSON body of POST /api/v1/bills. Type, StoreID, and

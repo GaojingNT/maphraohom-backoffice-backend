@@ -140,3 +140,57 @@ func TestValidateBillInput_MultipleRowErrorsAreAllReported(t *testing.T) {
 		t.Errorf("row 0 is valid and should not have an error, got %+v", errs)
 	}
 }
+
+var scopedProducts = map[int]models.Product{
+	1: {BaseModel: models.BaseModel{ID: 1}, Name: "เนื้อพับ 1.5 ชั้น", Unit: "กก.", BillScope: models.ProductScopeAll},
+	3: {BaseModel: models.BaseModel{ID: 3}, Name: "ค่าขนส่ง", Unit: "ครั้ง", BillScope: models.ProductScopePayment},
+}
+
+// A payment bill can mix catalog products, payment-only products and
+// typed-in items.
+func TestValidateBillInput_PaymentTypedItems(t *testing.T) {
+	items := []dtos.CreateBillItem{
+		{ProductID: 1, Quantity: d("2"), Price: d("80")},
+		{ProductID: 3, Quantity: d("1"), Price: d("300")},
+		{ProductName: "  ค่า  น้ำแข็ง ", Unit: "ถุง", Quantity: d("4"), Price: d("20")},
+	}
+
+	if errs := validateBillInput(models.BillTypePayment, d("0"), d("0"), items, scopedProducts); len(errs) != 0 {
+		t.Fatalf("expected no errors, got %+v", errs)
+	}
+}
+
+func TestValidateBillInput_TypedItemRules(t *testing.T) {
+	items := []dtos.CreateBillItem{
+		{ProductName: "   ", Unit: "ถุง", Quantity: d("1"), Price: d("1")},
+		{ProductName: "ค่าแรง", Unit: "วัน", Quantity: d("1"), Price: d("1")},
+		{ProductName: "น้ำดื่ม", Unit: "ขวด", Quantity: d("1.5"), Price: d("1")},
+	}
+
+	errs := validateBillInput(models.BillTypePayment, d("0"), d("0"), items, scopedProducts)
+	for _, field := range []string{"items[0].productName", "items[1].unit", "items[2].quantity"} {
+		if !hasFieldError(errs, field) {
+			t.Errorf("expected a %q field error, got %+v", field, errs)
+		}
+	}
+}
+
+// Receipt bills only take "all" products: no typed-in items, no
+// payment-only products.
+func TestValidateBillInput_ReceiptRejectsPaymentItems(t *testing.T) {
+	items := []dtos.CreateBillItem{
+		{ProductID: 1, Quantity: d("1"), Price: d("1")},
+		{ProductID: 3, Quantity: d("1"), Price: d("1")},
+		{ProductName: "ค่าขนส่ง", Unit: "ครั้ง", Quantity: d("1"), Price: d("1")},
+	}
+
+	errs := validateBillInput(models.BillTypeReceipt, d("0"), d("0"), items, scopedProducts)
+	if hasFieldError(errs, "items[0].productId") {
+		t.Errorf("catalog product rejected on a receipt bill: %+v", errs)
+	}
+	for _, field := range []string{"items[1].productId", "items[2].productId"} {
+		if !hasFieldError(errs, field) {
+			t.Errorf("expected a %q field error, got %+v", field, errs)
+		}
+	}
+}

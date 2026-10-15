@@ -3,6 +3,7 @@ package bill_module
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -20,12 +21,17 @@ import (
 // CreateBillItemInput is one already-priced, already-validated line item —
 // Unit and Subtotal are resolved by the service before the repository ever
 // sees them.
+//
+// ProductID 0 means a typed-in payment-bill item whose product doesn't
+// exist yet: the repository creates it (or picks up one created
+// concurrently) from NewProductName/Unit inside the bill's transaction.
 type CreateBillItemInput struct {
-	ProductID int
-	Unit      string
-	Quantity  decimal.Decimal
-	Price     decimal.Decimal
-	Subtotal  decimal.Decimal
+	ProductID      int
+	NewProductName string
+	Unit           string
+	Quantity       decimal.Decimal
+	Price          decimal.Decimal
+	Subtotal       decimal.Decimal
 }
 
 // CreateBillInput carries the already-validated, already-priced fields the
@@ -231,6 +237,88 @@ func (r Repository) GetProductsByID(ctx context.Context, ids []int) (map[int]mod
 	return byID, nil
 }
 
+// GetProductsByName returns the (non-deleted) products whose name matches
+// one of names, case-insensitively, keyed by the lower-cased name. names must
+// already be normalized (models.NormalizeProductName).
+func (r Repository) GetProductsByName(ctx context.Context, names []string) (map[string]models.Product, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "GetProductsByNameRepository", trace.WithAttributes(attribute.String("repository", "GetProductsByName")))
+		products     = make([]models.Product, 0, len(names))
+		err          error
+	)
+
+	lowered := make([]string, 0, len(names))
+	for _, name := range names {
+		lowered = append(lowered, strings.ToLower(name))
+	}
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Where("lower(name) IN ?", lowered).Order("id").Find(&products).Error; err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			err = e.(error)
+			r.logger.Error(err.Error())
+			sentry.CaptureException(err)
+			exception.SqlErrorMessage = err.Error()
+			err = exception.ErrDbQueryStatement
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	byName := make(map[string]models.Product, len(products))
+	for _, p := range products {
+		// Oldest wins if two ever share a name.
+		if _, taken := byName[strings.ToLower(p.Name)]; !taken {
+			byName[strings.ToLower(p.Name)] = p
+		}
+	}
+	return byName, nil
+}
+
+// resolveItemProductID returns the item's product id, creating the product
+// first for a typed-in payment-bill item (ProductID 0). A transaction-scoped
+// advisory lock on the name serializes concurrent bills typing the same new
+// name, and the lookup is repeated under it, so they end up sharing one
+// product instead of creating two.
+func resolveItemProductID(tx *gorm.DB, item CreateBillItemInput) (int, error) {
+	if item.ProductID != 0 {
+		return item.ProductID, nil
+	}
+
+	key := strings.ToLower(item.NewProductName)
+	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", "product:"+key).Error; err != nil {
+		return 0, err
+	}
+
+	var existing models.Product
+	err := tx.Where("lower(name) = ?", key).Order("id").First(&existing).Error
+	if err == nil {
+		return existing.ID, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return 0, err
+	}
+
+	product := models.Product{
+		Name:      item.NewProductName,
+		Unit:      item.Unit,
+		BillScope: models.ProductScopePayment,
+	}
+	if err := tx.Create(&product).Error; err != nil {
+		return 0, err
+	}
+	return product.ID, nil
+}
+
 // CustomerExists reports whether a (non-deleted) customer with this id
 // exists.
 func (r Repository) CustomerExists(ctx context.Context, id int) (bool, error) {
@@ -427,8 +515,12 @@ func (r Repository) CreateBill(ctx context.Context, input CreateBillInput) (mode
 
 				billItems := make([]models.BillItem, 0, len(input.Items))
 				for _, item := range input.Items {
+					productID, txErr := resolveItemProductID(tx, item)
+					if txErr != nil {
+						return txErr
+					}
 					billItems = append(billItems, models.BillItem{
-						ProductID: item.ProductID,
+						ProductID: productID,
 						Unit:      item.Unit,
 						Quantity:  item.Quantity,
 						Price:     item.Price,
@@ -523,9 +615,13 @@ func (r Repository) UpdateBill(ctx context.Context, id int, input UpdateBillInpu
 
 				billItems := make([]models.BillItem, 0, len(input.Items))
 				for _, item := range input.Items {
+					productID, txErr := resolveItemProductID(tx, item)
+					if txErr != nil {
+						return txErr
+					}
 					billItems = append(billItems, models.BillItem{
 						BillID:    bill.ID,
-						ProductID: item.ProductID,
+						ProductID: productID,
 						Unit:      item.Unit,
 						Quantity:  item.Quantity,
 						Price:     item.Price,

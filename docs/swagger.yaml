@@ -52,8 +52,12 @@ definitions:
         type: number
       productId:
         type: integer
+      productName:
+        type: string
       quantity:
         type: number
+      unit:
+        type: string
     type: object
   dtos.CreateCustomer:
     properties:
@@ -442,6 +446,8 @@ definitions:
     type: object
   responses.ProductListItem:
     properties:
+      billScope:
+        type: string
       id:
         type: integer
       name:
@@ -1378,7 +1384,9 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get every product (id, name, unit)
+      description: Get every product (id, name, unit, billScope). billScope "all"
+        products can go on any bill; "payment" ones (typed in on payment bills) on
+        payment bills only.
       produces:
       - application/json
       responses:

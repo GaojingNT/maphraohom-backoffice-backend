@@ -1335,7 +1335,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get every product (id, name, unit)",
+                "description": "Get every product (id, name, unit, billScope). billScope \"all\" products can go on any bill; \"payment\" ones (typed in on payment bills) on payment bills only.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2091,8 +2091,14 @@ const docTemplate = `{
                 "productId": {
                     "type": "integer"
                 },
+                "productName": {
+                    "type": "string"
+                },
                 "quantity": {
                     "type": "number"
+                },
+                "unit": {
+                    "type": "string"
                 }
             }
         },
@@ -2675,6 +2681,9 @@ const docTemplate = `{
         "responses.ProductListItem": {
             "type": "object",
             "properties": {
+                "billScope": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
