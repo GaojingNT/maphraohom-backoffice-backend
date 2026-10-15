@@ -163,12 +163,13 @@ func TestValidateBillInput_PaymentTypedItems(t *testing.T) {
 func TestValidateBillInput_TypedItemRules(t *testing.T) {
 	items := []dtos.CreateBillItem{
 		{ProductName: "   ", Unit: "ถุง", Quantity: d("1"), Price: d("1")},
-		{ProductName: "ค่าแรง", Unit: "วัน", Quantity: d("1"), Price: d("1")},
+		{ProductName: "ค่าแรง", Unit: "  ", Quantity: d("1"), Price: d("1")},
 		{ProductName: "น้ำดื่ม", Unit: "ขวด", Quantity: d("1.5"), Price: d("1")},
+		{ProductName: "ค่าลังโฟม", Unit: "ลังโฟมขนาดใหญ่พิเศษสำหรับส่งของ", Quantity: d("1"), Price: d("1")},
 	}
 
 	errs := validateBillInput(models.BillTypePayment, d("0"), d("0"), items, scopedProducts)
-	for _, field := range []string{"items[0].productName", "items[1].unit", "items[2].quantity"} {
+	for _, field := range []string{"items[0].productName", "items[1].unit", "items[2].quantity", "items[3].unit"} {
 		if !hasFieldError(errs, field) {
 			t.Errorf("expected a %q field error, got %+v", field, errs)
 		}
@@ -191,6 +192,32 @@ func TestValidateBillInput_ReceiptRejectsPaymentItems(t *testing.T) {
 	for _, field := range []string{"items[1].productId", "items[2].productId"} {
 		if !hasFieldError(errs, field) {
 			t.Errorf("expected a %q field error, got %+v", field, errs)
+		}
+	}
+}
+
+// On a payment bill an item's unit can be set per bill — including a
+// catalog product's, and a free-typed unit like "ลัง" — while a receipt
+// bill always bills in the product's own unit.
+func TestItemUnit(t *testing.T) {
+	coconut := scopedProducts[1]
+	fee := scopedProducts[3]
+	cases := []struct {
+		name     string
+		billType string
+		item     dtos.CreateBillItem
+		product  *models.Product
+		want     string
+	}{
+		{"payment override", models.BillTypePayment, dtos.CreateBillItem{Unit: " ลัง "}, &fee, "ลัง"},
+		{"payment fallback", models.BillTypePayment, dtos.CreateBillItem{}, &fee, "ครั้ง"},
+		{"payment catalog override", models.BillTypePayment, dtos.CreateBillItem{Unit: "ลูก"}, &coconut, "ลูก"},
+		{"payment typed", models.BillTypePayment, dtos.CreateBillItem{Unit: "กล่อง"}, nil, "กล่อง"},
+		{"receipt ignores unit", models.BillTypeReceipt, dtos.CreateBillItem{Unit: "ลัง"}, &coconut, "กก."},
+	}
+	for _, c := range cases {
+		if got := itemUnit(c.billType, c.item, c.product); got != c.want {
+			t.Errorf("%s: itemUnit = %q, want %q", c.name, got, c.want)
 		}
 	}
 }

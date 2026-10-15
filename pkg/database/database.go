@@ -158,8 +158,8 @@ func AutoMigrate(dbConn *gorm.DB) {
 		log.Fatal(err)
 	}
 
-	// Let products use every unit an item typed in on a payment bill can
-	// have (same statements as migration 000005).
+	// Let products use any non-blank unit (same statements as migration
+	// 000006).
 	if err := dbConn.Exec(ProductUnitCheckSQL).Error; err != nil {
 		log.Fatal(err)
 	}

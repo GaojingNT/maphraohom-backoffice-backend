@@ -1,7 +1,6 @@
 package models
 
 import (
-	"slices"
 	"strings"
 
 	"gorm.io/gorm"
@@ -15,16 +14,16 @@ const (
 	ProductScopePayment = "payment"
 )
 
-// PaymentItemUnits are the units a user can pick for an item they type in
-// on a payment bill; the first is the default.
-var PaymentItemUnits = []string{"รายการ", "ครั้ง", "ชิ้น", "ถุง", "กก.", "ขวด"}
+// CommonUnits are the units the payment-bill form offers first; the first
+// is the default. Any other unit can be typed in (up to MaxUnitLength).
+var CommonUnits = []string{"รายการ", "ครั้ง", "ชิ้น", "ถุง", "ลัง", "กล่อง", "แพ็ค", "กก.", "ขวด", "ลิตร", "เที่ยว", "วัน"}
 
-func IsValidPaymentItemUnit(unit string) bool {
-	return slices.Contains(PaymentItemUnits, unit)
-}
+// MaxUnitLength matches the size of tbl_products.unit / tbl_bill_items.unit.
+const MaxUnitLength = 20
 
 // NormalizeProductName trims a typed product name and collapses inner runs
 // of whitespace, so "ค่า  ขนส่ง " and "ค่า ขนส่ง" are the same product.
+// Units are normalized the same way.
 func NormalizeProductName(name string) string {
 	return strings.Join(strings.Fields(name), " ")
 }
