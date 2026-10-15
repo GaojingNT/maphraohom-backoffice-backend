@@ -488,6 +488,10 @@ definitions:
     type: object
 info:
   contact: {}
+  description: 'REST API for the Maphraohom backoffice: authentication, users, stores,
+    products, customers, bills and files.'
+  title: Maphraohom Backoffice API
+  version: "1.0"
 paths:
   /api/v1/auth/encrypt-password:
     post:
@@ -516,6 +520,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/http_response.OkResponse'
+      security:
+      - BearerAuth: []
       summary: Encrypt password
       tags:
       - Auth Module (Version 1)
@@ -573,6 +579,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/http_response.OkResponse'
+      security:
+      - BearerAuth: []
       summary: Get profile
       tags:
       - Auth Module (Version 1)
@@ -611,6 +619,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Update profile
       tags:
       - Auth Module (Version 1)
@@ -646,6 +656,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Change my password
       tags:
       - Auth Module (Version 1)
@@ -670,6 +682,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Delete my signature
       tags:
       - Auth Module (Version 1)
@@ -707,6 +721,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Upload my signature
       tags:
       - Auth Module (Version 1)
@@ -758,7 +774,7 @@ paths:
       summary: reset password
       tags:
       - Auth Module (Version 1)
-  /api/v1/auth/signin:
+  /api/v1/auth/sign-in:
     post:
       consumes:
       - application/json
@@ -845,6 +861,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: List bills
       tags:
       - Bill Module (Version 1)
@@ -880,6 +898,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Create bill
       tags:
       - Bill Module (Version 1)
@@ -910,6 +930,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Delete bill
       tags:
       - Bill Module (Version 1)
@@ -939,6 +961,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Get bill
       tags:
       - Bill Module (Version 1)
@@ -981,6 +1005,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Update bill
       tags:
       - Bill Module (Version 1)
@@ -1010,6 +1036,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Delete a bill's slip
       tags:
       - Bill Module (Version 1)
@@ -1051,6 +1079,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Upload a bill's slip
       tags:
       - Bill Module (Version 1)
@@ -1083,6 +1113,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: List customers
       tags:
       - Customer Module (Version 1)
@@ -1112,6 +1144,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Create customer
       tags:
       - Customer Module (Version 1)
@@ -1141,6 +1175,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Get customer
       tags:
       - Customer Module (Version 1)
@@ -1168,6 +1204,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: List a customer's addresses
       tags:
       - Customer Module (Version 1)
@@ -1206,6 +1244,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Add a customer address
       tags:
       - Customer Module (Version 1)
@@ -1233,6 +1273,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: List a customer's phone numbers
       tags:
       - Customer Module (Version 1)
@@ -1271,6 +1313,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Add a customer phone number
       tags:
       - Customer Module (Version 1)
@@ -1302,6 +1346,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Get an uploaded file
       tags:
       - File Module (Version 1)
@@ -1323,6 +1369,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: List products
       tags:
       - Product Module (Version 1)
@@ -1355,6 +1403,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: List stores
       tags:
       - Store Module (Version 1)
@@ -1384,6 +1434,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Get store
       tags:
       - Store Module (Version 1)
@@ -1419,6 +1471,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Update store
       tags:
       - Store Module (Version 1)
@@ -1448,6 +1502,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Delete a store's logo
       tags:
       - Store Module (Version 1)
@@ -1489,6 +1545,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Upload a store's logo
       tags:
       - Store Module (Version 1)
@@ -1526,6 +1584,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: List a store's last-used prices
       tags:
       - Store Module (Version 1)
@@ -1562,6 +1622,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: List users
       tags:
       - User Module (Version 1)
@@ -1603,6 +1665,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Create user
       tags:
       - User Module (Version 1)
@@ -1632,6 +1696,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Delete user
       tags:
       - User Module (Version 1)
@@ -1660,6 +1726,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Get user
       tags:
       - User Module (Version 1)
@@ -1706,6 +1774,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/exception.ErrorResponse'
+      security:
+      - BearerAuth: []
       summary: Update user
       tags:
       - User Module (Version 1)
@@ -1726,4 +1796,10 @@ paths:
       summary: Healthcheck
       tags:
       - Healthcheck
+securityDefinitions:
+  BearerAuth:
+    description: Enter the JWT from /api/v1/auth/sign-in as "Bearer <token>".
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

@@ -30,6 +30,7 @@ import (
 //	@Success		200		{object}	paginator.Pagination
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/bills [get]
 func (c Controller) GetBills(f *fiber.Ctx) error {
 	var (
@@ -94,6 +95,7 @@ func (c Controller) GetBills(f *fiber.Ctx) error {
 //	@Success		200	{object}	responses.BillDetailResponse
 //	@Failure		404	{object}	exception.ErrorResponse
 //	@Failure		500	{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/bills/{id} [get]
 func (c Controller) GetBill(f *fiber.Ctx) error {
 	var (
@@ -131,6 +133,7 @@ func (c Controller) GetBill(f *fiber.Ctx) error {
 //	@Success		201		{object}	responses.BillDetailResponse
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/bills [post]
 func (c Controller) CreateBill(f *fiber.Ctx) error {
 	var (
@@ -174,6 +177,7 @@ func (c Controller) CreateBill(f *fiber.Ctx) error {
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		404		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/bills/{id} [put]
 func (c Controller) UpdateBill(f *fiber.Ctx) error {
 	var (
@@ -216,6 +220,7 @@ func (c Controller) UpdateBill(f *fiber.Ctx) error {
 //	@Success		200	{object}	http_response.OkResponse
 //	@Failure		404	{object}	exception.ErrorResponse
 //	@Failure		500	{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/bills/{id} [delete]
 func (c Controller) DeleteBill(f *fiber.Ctx) error {
 	var (
@@ -249,6 +254,7 @@ func (c Controller) DeleteBill(f *fiber.Ctx) error {
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		404		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/bills/{id}/slip [put]
 func (c Controller) UploadSlip(f *fiber.Ctx) error {
 	var (
@@ -294,6 +300,7 @@ func (c Controller) UploadSlip(f *fiber.Ctx) error {
 //	@Success		200	{object}	http_response.OkResponse
 //	@Failure		404	{object}	exception.ErrorResponse
 //	@Failure		500	{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/bills/{id}/slip [delete]
 func (c Controller) DeleteSlip(f *fiber.Ctx) error {
 	var (

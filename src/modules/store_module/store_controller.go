@@ -23,6 +23,7 @@ import (
 //	@Param			search	query		string	false	"search keyword"
 //	@Success		200		{object}	paginator.Pagination
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/stores [get]
 func (c Controller) GetStores(f *fiber.Ctx) error {
 	var (
@@ -64,6 +65,7 @@ func (c Controller) GetStores(f *fiber.Ctx) error {
 //	@Success		200	{object}	responses.StoreDetailResponse
 //	@Failure		404	{object}	exception.ErrorResponse
 //	@Failure		500	{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/stores/{id} [get]
 func (c Controller) GetStore(f *fiber.Ctx) error {
 	id, _ := f.ParamsInt("id")
@@ -93,6 +95,7 @@ func (c Controller) GetStore(f *fiber.Ctx) error {
 //	@Success		200		{object}	responses.StoreDetailResponse
 //	@Failure		404		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/stores/{id} [put]
 func (c Controller) UpdateStore(f *fiber.Ctx) error {
 	id, _ := f.ParamsInt("id")
@@ -128,6 +131,7 @@ func (c Controller) UpdateStore(f *fiber.Ctx) error {
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		404		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/stores/{id}/logo [put]
 func (c Controller) UploadLogo(f *fiber.Ctx) error {
 	id, _ := f.ParamsInt("id")
@@ -171,6 +175,7 @@ func (c Controller) UploadLogo(f *fiber.Ctx) error {
 //	@Success		200	{object}	http_response.OkResponse
 //	@Failure		404	{object}	exception.ErrorResponse
 //	@Failure		500	{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/stores/{id}/logo [delete]
 func (c Controller) DeleteLogo(f *fiber.Ctx) error {
 	id, _ := f.ParamsInt("id")
@@ -200,6 +205,7 @@ func (c Controller) DeleteLogo(f *fiber.Ctx) error {
 //	@Success		200		{array}		responses.LastPriceItem
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/stores/{storeId}/last-prices [get]
 func (c Controller) GetLastPrices(f *fiber.Ctx) error {
 	storeID, _ := f.ParamsInt("storeId")

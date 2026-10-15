@@ -24,7 +24,7 @@ import (
 //	@Success		200			{object}	http_response.OkResponse
 //	@Failure		400			{object}	http_response.OkResponse
 //	@Failure		500			{object}	http_response.OkResponse
-//	@Router			/api/v1/auth/signin [post]
+//	@Router			/api/v1/auth/sign-in [post]
 func (c Controller) SignIn(f *fiber.Ctx) error {
 	var (
 		ctx, span   = c.m.tracer.TraceStart(f.Context(), "SignInController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "SignIn")))
@@ -169,6 +169,7 @@ func (c Controller) ResetPassword(f *fiber.Ctx) error {
 //	@Success		200			{object}	http_response.OkResponse
 //	@Failure		400			{object}	http_response.OkResponse
 //	@Failure		500			{object}	http_response.OkResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/auth/encrypt-password [post]
 func (c Controller) EncryptPassword(f *fiber.Ctx) error {
 	var (
@@ -211,6 +212,7 @@ func (c Controller) EncryptPassword(f *fiber.Ctx) error {
 //	@Failure		400	{object}	http_response.OkResponse
 //	@Failure		401	{object}	http_response.OkResponse
 //	@Failure		500	{object}	http_response.OkResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/auth/profile [get]
 func (c Controller) GetProfile(f *fiber.Ctx) error {
 	var (

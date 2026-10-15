@@ -24,6 +24,7 @@ import (
 //	@Failure		401		{object}	exception.ErrorResponse
 //	@Failure		409		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/auth/profile [put]
 func (c Controller) UpdateProfile(f *fiber.Ctx) error {
 	ctx, span := c.m.tracer.TraceStart(f.Context(), "UpdateProfileController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "UpdateProfile")))
@@ -67,6 +68,7 @@ func (c Controller) UpdateProfile(f *fiber.Ctx) error {
 //	@Failure		400			{object}	exception.ErrorResponse
 //	@Failure		401			{object}	exception.ErrorResponse
 //	@Failure		500			{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/auth/profile/signature [put]
 func (c Controller) UploadSignature(f *fiber.Ctx) error {
 	ctx, span := c.m.tracer.TraceStart(f.Context(), "UploadSignatureController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "UploadSignature")))
@@ -110,6 +112,7 @@ func (c Controller) UploadSignature(f *fiber.Ctx) error {
 //	@Success		200	{object}	http_response.OkResponse
 //	@Failure		401	{object}	exception.ErrorResponse
 //	@Failure		500	{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/auth/profile/signature [delete]
 func (c Controller) DeleteSignature(f *fiber.Ctx) error {
 	ctx, span := c.m.tracer.TraceStart(f.Context(), "DeleteSignatureController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "DeleteSignature")))
@@ -139,6 +142,7 @@ func (c Controller) DeleteSignature(f *fiber.Ctx) error {
 //	@Failure		400		{object}	exception.ErrorResponse
 //	@Failure		401		{object}	exception.ErrorResponse
 //	@Failure		500		{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/auth/profile/password [put]
 func (c Controller) ChangePassword(f *fiber.Ctx) error {
 	ctx, span := c.m.tracer.TraceStart(f.Context(), "ChangePasswordController", trace.WithAttributes(attribute.String("server", "http"), attribute.String("controller", "ChangePassword")))

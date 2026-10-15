@@ -17,6 +17,11 @@ const docTemplate = `{
     "paths": {
         "/api/v1/auth/encrypt-password": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Encrypt password",
                 "consumes": [
                     "application/json"
@@ -109,6 +114,11 @@ const docTemplate = `{
         },
         "/api/v1/auth/profile": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get profile",
                 "consumes": [
                     "application/json"
@@ -148,6 +158,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Replace the signed-in user's first name, last name and email. The signature is uploaded through its own endpoint.",
                 "consumes": [
                     "application/json"
@@ -206,6 +221,11 @@ const docTemplate = `{
         },
         "/api/v1/auth/profile/password": {
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Replace the signed-in user's password. The current password must be given and correct; newPassword must be 8+ characters and match confirmPassword.",
                 "consumes": [
                     "application/json"
@@ -258,6 +278,11 @@ const docTemplate = `{
         },
         "/api/v1/auth/profile/signature": {
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Upload a signature image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for the signed-in user. Replaces any existing signature. Printed on every receipt this user exports.",
                 "consumes": [
                     "multipart/form-data"
@@ -311,6 +336,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Clear the signed-in user's signature and remove the underlying file (best-effort)",
                 "consumes": [
                     "application/json"
@@ -417,7 +447,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/signin": {
+        "/api/v1/auth/sign-in": {
             "post": {
                 "description": "Sign in",
                 "consumes": [
@@ -474,6 +504,11 @@ const docTemplate = `{
         },
         "/api/v1/bills": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get bills (paginated) — id, type, storeId, storeName, bookNo,\nreceiptNo, customerName, customerAddress, total, itemCount, hasSlip, createdAt",
                 "consumes": [
                     "application/json"
@@ -551,6 +586,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Create a bill (JSON) with one or more line items, priced by the\ncaller (no price list). Book/receipt numbers are computed\nserver-side, scoped per (store, type); unit/subtotal/total and\nanything else derivable are ignored if the client sends them.\ncreatedAt is optional (RFC3339) to back-/post-date the bill —\ndefaults to now when omitted; never affects book/receipt numbering.",
                 "consumes": [
                     "application/json"
@@ -597,6 +637,11 @@ const docTemplate = `{
         },
         "/api/v1/bills/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get bill by id — every bills column except deleted_at, plus a ready-to-use slipUrl",
                 "consumes": [
                     "application/json"
@@ -639,6 +684,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Replace a bill's customer, items, discount, and shipping fee\n(JSON, same shape as create). storeId and type must match the\nexisting bill — sending different values is rejected with 400.\nBook/receipt numbers and the slip are never touched here.",
                 "consumes": [
                     "application/json"
@@ -696,6 +746,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Delete bill by id — soft delete only, slip and book/receipt number are kept as-is (never reused)",
                 "consumes": [
                     "application/json"
@@ -740,6 +795,11 @@ const docTemplate = `{
         },
         "/api/v1/bills/{id}/slip": {
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Upload a slip image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing, non-deleted bill. Replaces any existing slip.",
                 "consumes": [
                     "multipart/form-data"
@@ -800,6 +860,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Clear a bill's slip and remove the underlying file (best-effort)",
                 "consumes": [
                     "application/json"
@@ -844,6 +909,11 @@ const docTemplate = `{
         },
         "/api/v1/customers": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get customers (paginated)",
                 "consumes": [
                     "application/json"
@@ -891,6 +961,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Create a new customer by name",
                 "consumes": [
                     "application/json"
@@ -937,6 +1012,11 @@ const docTemplate = `{
         },
         "/api/v1/customers/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get customer by id",
                 "consumes": [
                     "application/json"
@@ -981,6 +1061,11 @@ const docTemplate = `{
         },
         "/api/v1/customers/{id}/addresses": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get every address on file for this customer",
                 "consumes": [
                     "application/json"
@@ -1020,6 +1105,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Add a new address for a customer, optionally marking it default",
                 "consumes": [
                     "application/json"
@@ -1079,6 +1169,11 @@ const docTemplate = `{
         },
         "/api/v1/customers/{id}/phones": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get every phone number on file for this customer (default-first)",
                 "consumes": [
                     "application/json"
@@ -1118,6 +1213,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Add a new phone number for a customer, optionally marking it default",
                 "consumes": [
                     "application/json"
@@ -1177,6 +1277,11 @@ const docTemplate = `{
         },
         "/api/v1/files/{path}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Stream a file previously uploaded via POST/PUT /bills (e.g. a\npayment slip) by its storage key, such as bills/slips/\u003cuuid\u003e.jpeg",
                 "produces": [
                     "application/octet-stream"
@@ -1221,6 +1326,11 @@ const docTemplate = `{
         },
         "/api/v1/products": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get every product (id, name, unit)",
                 "consumes": [
                     "application/json"
@@ -1253,6 +1363,11 @@ const docTemplate = `{
         },
         "/api/v1/stores": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get stores (paginated)",
                 "consumes": [
                     "application/json"
@@ -1302,6 +1417,11 @@ const docTemplate = `{
         },
         "/api/v1/stores/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get store by id",
                 "consumes": [
                     "application/json"
@@ -1344,6 +1464,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Replace a store's name, address, and phone. The logo is uploaded through its own endpoint.",
                 "consumes": [
                     "application/json"
@@ -1397,6 +1522,11 @@ const docTemplate = `{
         },
         "/api/v1/stores/{id}/logo": {
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Upload a logo image (jpeg/png/webp, checked by magic bytes, ≤ 10MB) for an existing store. Replaces any existing logo.",
                 "consumes": [
                     "multipart/form-data"
@@ -1457,6 +1587,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Clear a store's logo and remove the underlying file (best-effort)",
                 "consumes": [
                     "application/json"
@@ -1501,6 +1636,11 @@ const docTemplate = `{
         },
         "/api/v1/stores/{storeId}/last-prices": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get, for every product, the price used in this store's most recent bill of the given type — used to prefill the create-bill form (optional).",
                 "consumes": [
                     "application/json"
@@ -1555,6 +1695,11 @@ const docTemplate = `{
         },
         "/api/v1/users": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "get users",
                 "consumes": [
                     "application/json"
@@ -1608,6 +1753,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Create an new user",
                 "consumes": [
                     "application/json"
@@ -1672,6 +1822,11 @@ const docTemplate = `{
         },
         "/api/v1/users/{user_id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Get user",
                 "consumes": [
                     "application/json"
@@ -1714,6 +1869,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Update an existing user",
                 "consumes": [
                     "application/json"
@@ -1783,6 +1943,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Delete user",
                 "consumes": [
                     "application/json"
@@ -2580,17 +2745,25 @@ const docTemplate = `{
                 }
             }
         }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Enter the JWT from /api/v1/auth/sign-in as \"Bearer \u003ctoken\u003e\".",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
     }
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
+	Version:          "1.0",
 	Host:             "",
 	BasePath:         "",
 	Schemes:          []string{},
-	Title:            "",
-	Description:      "",
+	Title:            "Maphraohom Backoffice API",
+	Description:      "REST API for the Maphraohom backoffice: authentication, users, stores, products, customers, bills and files.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

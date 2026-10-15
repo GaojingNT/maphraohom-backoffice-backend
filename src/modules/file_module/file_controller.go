@@ -25,6 +25,7 @@ import (
 //	@Failure		400	{object}	exception.ErrorResponse
 //	@Failure		404	{object}	exception.ErrorResponse
 //	@Failure		500	{object}	exception.ErrorResponse
+//	@Security		BearerAuth
 //	@Router			/api/v1/files/{path} [get]
 func (c Controller) GetFile(f *fiber.Ctx) error {
 	var (
