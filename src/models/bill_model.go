@@ -39,6 +39,12 @@ type Bill struct {
 	CustomerID *int      `json:"customerId,omitempty" gorm:"column:customer_id;null;"`
 	Customer   *Customer `json:"customer,omitempty" gorm:"foreignKey:CustomerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 
+	// Optional sales channel (tbl_platform_types) — receipt bills only;
+	// always nil on a payment bill. nil for every bill from before the
+	// column existed.
+	PlatformTypeID *int          `json:"platformTypeId" gorm:"column:platform_type_id;null;index;"`
+	PlatformType   *PlatformType `json:"platformType,omitempty" gorm:"foreignKey:PlatformTypeID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+
 	// Line items — one bill can carry several products.
 	Items []BillItem `json:"items,omitempty" gorm:"foreignKey:BillID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 

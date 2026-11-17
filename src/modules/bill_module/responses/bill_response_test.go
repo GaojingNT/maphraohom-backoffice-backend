@@ -95,3 +95,45 @@ func TestBillDetailResponse_Slips(t *testing.T) {
 		t.Errorf("slipUrl = %s", got)
 	}
 }
+
+// platformTypeId/platformType are JSON null for a bill without a platform,
+// and carry the platform with a ready-to-use logo URL otherwise.
+func TestBillDetailResponse_PlatformType(t *testing.T) {
+	out := makeJSON(t, models.Bill{})
+	for _, key := range []string{"platformTypeId", "platformType"} {
+		if got := string(out[key]); got != "null" {
+			t.Errorf("%s with none = %s, want null", key, got)
+		}
+	}
+
+	platformID := 4
+	out = makeJSON(t, models.Bill{
+		PlatformTypeID: &platformID,
+		PlatformType: &models.PlatformType{
+			BaseModel: models.BaseModel{ID: 4},
+			Code:      "shopee",
+			Name:      "Shopee",
+			Logo:      "platform-types/shopee.png",
+		},
+	})
+	if got := string(out["platformTypeId"]); got != "4" {
+		t.Errorf("platformTypeId = %s", got)
+	}
+	want := `{"id":4,"code":"shopee","name":"Shopee","logoUrl":"/api/v1/files/platform-types/shopee.png"}`
+	if got := string(out["platformType"]); got != want {
+		t.Errorf("platformType = %s, want %s", got, want)
+	}
+}
+
+func TestBillListItem_PlatformType(t *testing.T) {
+	items := BillListItem{}.Collection([]models.Bill{
+		{},
+		{PlatformType: &models.PlatformType{BaseModel: models.BaseModel{ID: 1}, Code: "facebook", Name: "Facebook"}},
+	})
+	if items[0].PlatformType != nil {
+		t.Errorf("bill without platform: platformType = %+v, want nil", items[0].PlatformType)
+	}
+	if p := items[1].PlatformType; p == nil || p.Code != "facebook" || p.LogoURL != "" {
+		t.Errorf("platformType = %+v", p)
+	}
+}

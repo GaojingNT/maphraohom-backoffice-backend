@@ -25,6 +25,7 @@ import (
 //	@Param			search	query		string	false	"search keyword"
 //	@Param			type	query		string	false	"filter by bill type: receipt or payment"
 //	@Param			storeId	query		int		false	"filter by store id"
+//	@Param			platformTypeId	query	string	false	"filter by platform type id, or none for bills without a platform"
 //	@Param			from	query		string	false	"filter created_at >= this date, YYYY-MM-DD"
 //	@Param			to		query		string	false	"filter created_at <= this date, YYYY-MM-DD"
 //	@Success		200		{object}	paginator.Pagination
@@ -48,12 +49,21 @@ func (c Controller) GetBills(f *fiber.Ctx) error {
 	queryStoreID := f.QueryInt("storeId", 0)
 	queryFrom := f.Query("from")
 	queryTo := f.Query("to")
+	queryPlatform := f.Query("platformTypeId")
 
 	if queryType != "" && !models.IsValidBillType(queryType) {
 		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, exception.ErrInvalidRequestParameter, exception.ParameterError{
 			FailedField: "type",
 			Tag:         "oneof=receipt payment",
 			Value:       queryType,
+		})
+	}
+
+	if !validPlatformFilter(queryPlatform) {
+		return exception.HttpErrorResponseMapping(f, fiber.StatusBadRequest, exception.InvalidRequestParameterResponseError, exception.ErrInvalidRequestParameter, exception.ParameterError{
+			FailedField: "platformTypeId",
+			Tag:         "platform id or none",
+			Value:       queryPlatform,
 		})
 	}
 
@@ -73,6 +83,7 @@ func (c Controller) GetBills(f *fiber.Ctx) error {
 		paginator.WithAttributes("store_id", queryStoreID),
 		paginator.WithAttributes("from", queryFrom),
 		paginator.WithAttributes("to", queryTo),
+		paginator.WithAttributes("platform_type_id", queryPlatform),
 	)
 
 	responseData, err = c.billService().GetBills(ctx, paginate)

@@ -54,6 +54,7 @@ type CreateBillInput struct {
 	ShippingFee     decimal.Decimal
 	Total           decimal.Decimal
 	Items           []CreateBillItemInput
+	PlatformTypeID  *int
 	// CreatedAt back-/post-dates the bill when set — nil means "now" (the
 	// database column's own default). Never affects book/receipt numbering,
 	// which is scoped by the real server clock's calendar year regardless.
@@ -77,6 +78,7 @@ type UpdateBillInput struct {
 	ShippingFee     decimal.Decimal
 	Total           decimal.Decimal
 	Items           []CreateBillItemInput
+	PlatformTypeID  *int
 }
 
 // billListFilters narrows GetBillPaginate beyond the generic search/period
@@ -102,6 +104,7 @@ func (r Repository) GetBillPaginate(ctx context.Context, pagination *paginator.P
 	storeIDAttribute, _ := pagination.GetIntAttribute("store_id")
 	fromAttribute, _ := pagination.GetStringAttribute("from")
 	toAttribute, _ := pagination.GetStringAttribute("to")
+	platformAttribute, _ := pagination.GetStringAttribute("platform_type_id")
 
 	// Set tracing attributes
 	r.tracer.SetAttributes(childSpan, attribute.String("search", searchAttribute))
@@ -114,6 +117,13 @@ func (r Repository) GetBillPaginate(ctx context.Context, pagination *paginator.P
 	}
 	if storeIDAttribute != 0 {
 		tx = tx.Where("store_id = ?", storeIDAttribute)
+	}
+	// "none" = bills without a platform; otherwise a platform id (already
+	// validated by the controller).
+	if platformAttribute == PlatformFilterNone {
+		tx = tx.Where("platform_type_id IS NULL")
+	} else if platformAttribute != "" {
+		tx = tx.Where("platform_type_id = ?", platformAttribute)
 	}
 	if from, err := time.ParseInLocation("2006-01-02", fromAttribute, time.Local); err == nil {
 		tx = tx.Where("created_at >= ?", from)
@@ -128,6 +138,7 @@ func (r Repository) GetBillPaginate(ctx context.Context, pagination *paginator.P
 			if err = tx.
 				Preload("Items").
 				Preload("Store").
+				Preload("PlatformType").
 				Scopes(models.SearchingScope(models.BillSearchable(), searchAttribute, searchByAttribute)).
 				Scopes(paginator.Paginate(bills, pagination, tx)).
 				Find(&bills).Error; err != nil {
@@ -345,6 +356,41 @@ func rememberProductUnit(tx *gorm.DB, productID int, unit string) error {
 
 // CustomerExists reports whether a (non-deleted) customer with this id
 // exists.
+// PlatformTypeExists reports whether a platform with this id exists.
+// Inactive platforms count: a bill already tagged with one can still be
+// saved unchanged.
+func (r Repository) PlatformTypeExists(ctx context.Context, id int) (bool, error) {
+	var (
+		_, childSpan = r.tracer.TraceStart(ctx, "PlatformTypeExistsRepository", trace.WithAttributes(attribute.String("repository", "PlatformTypeExists"), attribute.Int("id", id)))
+		count        int64
+		err          error
+	)
+
+	utils.Block{
+		Try: func() {
+			if err = r.db.Model(&models.PlatformType{}).Where("id = ?", id).Count(&count).Error; err != nil {
+				utils.Throw(err)
+			}
+		},
+		Catch: func(e utils.Exception) {
+			err = e.(error)
+			r.logger.Error(err.Error())
+			sentry.CaptureException(err)
+			exception.SqlErrorMessage = err.Error()
+			err = exception.ErrDbQueryStatement
+		},
+		Finally: nil,
+	}.Do()
+
+	r.tracer.TraceEnd(childSpan)
+
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
 func (r Repository) CustomerExists(ctx context.Context, id int) (bool, error) {
 	var (
 		_, childSpan = r.tracer.TraceStart(ctx, "CustomerExistsRepository", trace.WithAttributes(attribute.String("repository", "CustomerExists"), attribute.Int("id", id)))
@@ -422,6 +468,7 @@ func nextBillNumbers(tx *gorm.DB, storeID int, billType string) (bookNo int, rec
 func preloadBillDetail(db *gorm.DB) *gorm.DB {
 	return db.
 		Preload("Store").
+		Preload("PlatformType").
 		Preload("Items.Product").
 		Preload("Slips", func(db *gorm.DB) *gorm.DB {
 			return db.Order("id")
@@ -446,6 +493,7 @@ func newBill(input CreateBillInput, bookNo int, receiptNo int, customerID int) m
 		Discount:        input.Discount,
 		ShippingFee:     input.ShippingFee,
 		Total:           input.Total,
+		PlatformTypeID:  input.PlatformTypeID,
 		Slip:            nil,
 		CreatedBy:       input.CreatedBy,
 	}
@@ -469,6 +517,7 @@ func applyBillUpdate(bill *models.Bill, input UpdateBillInput, customerID int, n
 	bill.Discount = input.Discount
 	bill.ShippingFee = input.ShippingFee
 	bill.Total = input.Total
+	bill.PlatformTypeID = input.PlatformTypeID
 	bill.EditedAt = &now
 }
 
@@ -666,7 +715,7 @@ func (r Repository) UpdateBill(ctx context.Context, id int, input UpdateBillInpu
 				// The slip columns are owned by the slip endpoints — omit
 				// them so a concurrent slip change isn't overwritten with
 				// the values loaded above.
-				if txErr := tx.Omit("slip", "slip_uploaded_at", "Slips").Save(&bill).Error; txErr != nil {
+				if txErr := tx.Omit("slip", "slip_uploaded_at", "Slips", "PlatformType").Save(&bill).Error; txErr != nil {
 					return txErr
 				}
 
