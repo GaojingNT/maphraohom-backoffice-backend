@@ -6,6 +6,7 @@ import (
 
 	"github.com/shopspring/decimal"
 	"maphraohom.app/maphraohom-backoffice/src/models"
+	platformResponses "maphraohom.app/maphraohom-backoffice/src/modules/platform_type_module/responses"
 )
 
 type (
@@ -23,6 +24,8 @@ type (
 		ItemCount       int             `json:"itemCount"`
 		HasSlip         bool            `json:"hasSlip"`
 		CreatedAt       string          `json:"createdAt"`
+		// PlatformType is null when the bill has no platform.
+		PlatformType *platformResponses.PlatformTypeResponse `json:"platformType"`
 	}
 
 	// BillItemDetail is one line item within BillDetailResponse.
@@ -41,22 +44,26 @@ type (
 	// printable profile (name/logo/address/phone), the slips with
 	// ready-to-use URLs, and its line items (with each item's product name).
 	BillDetailResponse struct {
-		ID              int             `json:"id"`
-		Type            string          `json:"type"`
-		StoreID         int             `json:"storeId"`
-		StoreName       string          `json:"storeName"`
-		StoreLogo       string          `json:"storeLogo"`
-		StoreAddress    string          `json:"storeAddress"`
-		StorePhone      string          `json:"storePhone"`
-		CustomerID      *int            `json:"customerId,omitempty"`
-		BookNo          int             `json:"bookNo"`
-		ReceiptNo       int             `json:"receiptNo"`
-		CustomerName    string          `json:"customerName"`
-		CustomerAddress string          `json:"customerAddress"`
-		CustomerPhone   string          `json:"customerPhone"`
-		Discount        decimal.Decimal `json:"discount"`
-		ShippingFee     decimal.Decimal `json:"shippingFee"`
-		Total           decimal.Decimal `json:"total"`
+		ID           int    `json:"id"`
+		Type         string `json:"type"`
+		StoreID      int    `json:"storeId"`
+		StoreName    string `json:"storeName"`
+		StoreLogo    string `json:"storeLogo"`
+		StoreAddress string `json:"storeAddress"`
+		StorePhone   string `json:"storePhone"`
+		CustomerID   *int   `json:"customerId,omitempty"`
+		// PlatformTypeID/PlatformType are null when the bill has no
+		// platform (always on payment bills).
+		PlatformTypeID  *int                                    `json:"platformTypeId"`
+		PlatformType    *platformResponses.PlatformTypeResponse `json:"platformType"`
+		BookNo          int                                     `json:"bookNo"`
+		ReceiptNo       int                                     `json:"receiptNo"`
+		CustomerName    string                                  `json:"customerName"`
+		CustomerAddress string                                  `json:"customerAddress"`
+		CustomerPhone   string                                  `json:"customerPhone"`
+		Discount        decimal.Decimal                         `json:"discount"`
+		ShippingFee     decimal.Decimal                         `json:"shippingFee"`
+		Total           decimal.Decimal                         `json:"total"`
 		// SlipURL is the first of Slips' URLs (null when there are none) —
 		// kept for clients from before a bill could carry several slips.
 		SlipURL *string `json:"slipUrl"`
@@ -129,6 +136,7 @@ func (BillListItem) Collection(bills []models.Bill) []BillListItem {
 			ItemCount:       len(bill.Items),
 			HasSlip:         bill.Slip != nil,
 			CreatedAt:       bill.CreatedAt.Format("2006-01-02 15:04:05"),
+			PlatformType:    platformResponses.Make(bill.PlatformType),
 		})
 	}
 	return items
@@ -192,6 +200,8 @@ func (response *BillDetailResponse) Make(bill models.Bill) *BillDetailResponse {
 		StoreAddress:    storeAddress,
 		StorePhone:      storePhone,
 		CustomerID:      bill.CustomerID,
+		PlatformTypeID:  bill.PlatformTypeID,
+		PlatformType:    platformResponses.Make(bill.PlatformType),
 		BookNo:          bill.BookNo,
 		ReceiptNo:       bill.ReceiptNo,
 		CustomerName:    bill.CustomerName,

@@ -221,3 +221,45 @@ func TestItemUnit(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateBillPlatform(t *testing.T) {
+	id := func(v int) *int { return &v }
+	cases := []struct {
+		name     string
+		billType string
+		platform *int
+		wantTag  string
+	}{
+		{"receipt without platform", models.BillTypeReceipt, nil, ""},
+		{"payment without platform", models.BillTypePayment, nil, ""},
+		{"receipt with platform", models.BillTypeReceipt, id(3), ""},
+		{"payment with platform", models.BillTypePayment, id(3), "receiptOnly"},
+		{"receipt with zero id", models.BillTypeReceipt, id(0), "gt=0"},
+		{"receipt with negative id", models.BillTypeReceipt, id(-1), "gt=0"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateBillPlatform(tc.billType, tc.platform)
+			if tc.wantTag == "" {
+				if len(errs) != 0 {
+					t.Fatalf("want no error, got %+v", errs)
+				}
+				return
+			}
+			if len(errs) != 1 || errs[0].FailedField != "platformTypeId" || errs[0].Tag != tc.wantTag {
+				t.Fatalf("want platformTypeId/%s, got %+v", tc.wantTag, errs)
+			}
+		})
+	}
+}
+
+func TestValidPlatformFilter(t *testing.T) {
+	for value, want := range map[string]bool{
+		"": true, "none": true, "1": true, "12": true,
+		"0": false, "-3": false, "abc": false, "shopee": false, "1 OR 1=1": false,
+	} {
+		if got := validPlatformFilter(value); got != want {
+			t.Errorf("validPlatformFilter(%q) = %v, want %v", value, got, want)
+		}
+	}
+}

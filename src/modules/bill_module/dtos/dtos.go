@@ -36,6 +36,9 @@ type CreateBill struct {
 	Discount        decimal.Decimal  `json:"discount"`
 	ShippingFee     decimal.Decimal  `json:"shippingFee"`
 	Items           []CreateBillItem `json:"items"`
+	// PlatformTypeID tags the sale's channel (GET /platform-types) —
+	// optional, receipt bills only (400 on a payment bill).
+	PlatformTypeID *int `json:"platformTypeId,omitempty"`
 	// CreatedAt lets the client back- or post-date a bill (e.g. entering one
 	// for a sale that actually happened earlier) — RFC3339, e.g.
 	// "2026-09-20T14:30:00+07:00". Optional; defaults to the time the
@@ -49,6 +52,7 @@ type CreateBill struct {
 // CreateBill. StoreID and Type must match the existing bill's values (the
 // service rejects the request with 400 otherwise); Items replace the bill's
 // entire line-item set. BookNo/ReceiptNo and the slip are never touched.
+// PlatformTypeID replaces the bill's platform — omit/null clears it.
 type UpdateBill struct {
 	Type            string           `json:"type"`
 	StoreID         int              `json:"storeId"`
@@ -59,4 +63,5 @@ type UpdateBill struct {
 	Discount        decimal.Decimal  `json:"discount"`
 	ShippingFee     decimal.Decimal  `json:"shippingFee"`
 	Items           []CreateBillItem `json:"items"`
+	PlatformTypeID  *int             `json:"platformTypeId,omitempty"`
 }

@@ -2,6 +2,7 @@ package bill_module
 
 import (
 	"fmt"
+	"strconv"
 	"unicode/utf8"
 
 	"maphraohom.app/maphraohom-backoffice/internal/exception"
@@ -111,6 +112,38 @@ func validateBillInput(billType string, discount, shippingFee decimalLike, items
 	}
 
 	return errs
+}
+
+// PlatformFilterNone is the GET /bills?platformTypeId= value for "bills
+// without a platform".
+const PlatformFilterNone = "none"
+
+// validateBillPlatform checks the platform rules that need no database:
+// only a receipt bill may carry a platform, and an id must be positive.
+// Whether the id exists is checked by the service. nil (no platform) is
+// always valid.
+func validateBillPlatform(billType string, platformTypeID *int) []exception.ParameterError {
+	if platformTypeID == nil {
+		return nil
+	}
+	value := fmt.Sprintf("%d", *platformTypeID)
+	if billType != models.BillTypeReceipt {
+		return []exception.ParameterError{{FailedField: "platformTypeId", Tag: "receiptOnly", Value: value}}
+	}
+	if *platformTypeID <= 0 {
+		return []exception.ParameterError{{FailedField: "platformTypeId", Tag: "gt=0", Value: value}}
+	}
+	return nil
+}
+
+// validPlatformFilter reports whether a GET /bills platformTypeId query
+// value is usable: empty (no filter), "none", or a positive integer.
+func validPlatformFilter(value string) bool {
+	if value == "" || value == PlatformFilterNone {
+		return true
+	}
+	id, err := strconv.Atoi(value)
+	return err == nil && id > 0
 }
 
 // decimalLike is the subset of decimal.Decimal's API validateBillInput

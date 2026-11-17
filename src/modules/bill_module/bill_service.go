@@ -134,7 +134,7 @@ func (s Service) resolveAndPriceItems(ctx context.Context, billType string, item
 // validateAndPrice runs every check shared by create/update (type, item
 // rules, product/customer existence, and the total >= 0 rule), returning the
 // priced items and total on success, or the list of field errors otherwise.
-func (s Service) validateAndPrice(ctx context.Context, billType string, customerID *int, discount decimal.Decimal, shippingFee decimal.Decimal, items []dtos.CreateBillItem) ([]CreateBillItemInput, decimal.Decimal, []exception.ParameterError, error) {
+func (s Service) validateAndPrice(ctx context.Context, billType string, customerID *int, platformTypeID *int, discount decimal.Decimal, shippingFee decimal.Decimal, items []dtos.CreateBillItem) ([]CreateBillItemInput, decimal.Decimal, []exception.ParameterError, error) {
 	items, err := s.matchTypedItems(ctx, billType, items)
 	if err != nil {
 		return nil, decimal.Zero, nil, err
@@ -155,6 +155,18 @@ func (s Service) validateAndPrice(ctx context.Context, billType string, customer
 	}
 
 	fieldErrors := validateBillInput(billType, discount, shippingFee, items, products)
+
+	if platformErrors := validateBillPlatform(billType, platformTypeID); len(platformErrors) > 0 {
+		fieldErrors = append(fieldErrors, platformErrors...)
+	} else if platformTypeID != nil {
+		exists, err := s.billRepository().PlatformTypeExists(ctx, *platformTypeID)
+		if err != nil {
+			return nil, decimal.Zero, nil, err
+		}
+		if !exists {
+			fieldErrors = append(fieldErrors, exception.ParameterError{FailedField: "platformTypeId", Tag: "exists", Value: fmt.Sprintf("%d", *platformTypeID)})
+		}
+	}
 
 	if customerID != nil {
 		exists, err := s.billRepository().CustomerExists(ctx, *customerID)
@@ -198,7 +210,7 @@ func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill, createdBy
 		billType = models.BillTypeReceipt
 	}
 
-	pricedItems, total, fieldErrors, err := s.validateAndPrice(ctx, billType, dto.CustomerID, dto.Discount, dto.ShippingFee, dto.Items)
+	pricedItems, total, fieldErrors, err := s.validateAndPrice(ctx, billType, dto.CustomerID, dto.PlatformTypeID, dto.Discount, dto.ShippingFee, dto.Items)
 	if err != nil || len(fieldErrors) > 0 {
 		return nil, fieldErrors, err
 	}
@@ -214,6 +226,7 @@ func (s Service) CreateBill(ctx context.Context, dto *dtos.CreateBill, createdBy
 		ShippingFee:     dto.ShippingFee,
 		Total:           total,
 		Items:           pricedItems,
+		PlatformTypeID:  dto.PlatformTypeID,
 		CreatedAt:       dto.CreatedAt,
 		CreatedBy:       &createdBy,
 	})
@@ -236,7 +249,7 @@ func (s Service) UpdateBill(ctx context.Context, id int, dto *dtos.UpdateBill) (
 		billType = models.BillTypeReceipt
 	}
 
-	pricedItems, total, fieldErrors, err := s.validateAndPrice(ctx, billType, dto.CustomerID, dto.Discount, dto.ShippingFee, dto.Items)
+	pricedItems, total, fieldErrors, err := s.validateAndPrice(ctx, billType, dto.CustomerID, dto.PlatformTypeID, dto.Discount, dto.ShippingFee, dto.Items)
 	if err != nil || len(fieldErrors) > 0 {
 		return nil, fieldErrors, err
 	}
@@ -252,6 +265,7 @@ func (s Service) UpdateBill(ctx context.Context, id int, dto *dtos.UpdateBill) (
 		ShippingFee:     dto.ShippingFee,
 		Total:           total,
 		Items:           pricedItems,
+		PlatformTypeID:  dto.PlatformTypeID,
 	})
 	if err != nil {
 		return nil, nil, err

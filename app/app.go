@@ -121,6 +121,13 @@ func (app *ApplicationServer) initialize() {
 		storage.WithS3UseSSL(config.Global.FileSystem.S3Config.UseSSL),
 		storage.WithS3Prefix(config.Global.FileSystem.S3Config.Prefix),
 	)
+
+	// Seed the built-in sales platforms (rows + logos) — needs both the
+	// database and storage, so it runs here rather than in AutoMigrate.
+	// Insert-only; never touches bills.
+	if !fiber.IsChild() {
+		database.SeedPlatformTypes(database.DbClient, storage.FileStorage)
+	}
 }
 
 func (app *ApplicationServer) registerServerRouter() {

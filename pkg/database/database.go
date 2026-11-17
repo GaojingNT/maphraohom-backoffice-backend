@@ -142,6 +142,8 @@ func AutoMigrate(dbConn *gorm.DB) {
 		models.CustomerAddress{},
 		models.CustomerPhone{},
 		models.BillSequence{},
+		// Before Bill: tbl_bills.platform_type_id references it.
+		models.PlatformType{},
 		models.Bill{},
 		models.BillItem{},
 		models.BillSlip{},
